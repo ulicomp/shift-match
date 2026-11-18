@@ -17,7 +17,7 @@ import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import { InitialsAvatar, IconButton } from "./shared";
-import { useEngineVersion } from "./engineStore";
+import { useEngineVersion, setDockOpen } from "./engineStore";
 import { LogCancellationDialog } from "./LogCancellationDialog";
 import { TopStats } from "./TopStats";
 import { installElasticScroll } from "./elasticScroll";
@@ -60,7 +60,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const reset = () =>
     toast("Reset the demo?", {
       description: "Brings back the original open shifts and clears today's offers.",
-      action: { label: "Reset", onClick: () => resetDemo() },
+      action: {
+        label: "Reset",
+        onClick: () => {
+          setDockOpen(false);
+          resetDemo();
+        },
+      },
     });
   return (
     <div className="app-frame">
@@ -100,19 +106,30 @@ export function AppShell({ children }: { children: ReactNode }) {
           <h1 className="sr-only">{title}</h1>
           <TopStats />
           <div className="toolbar">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={agent}
-              className={`agent-switch ${agent ? "on" : ""}`}
-              onClick={() => setAgentMode(!agent)}
-            >
-              <AgentOrb size={22} active={agentRunning} />
-              <span>Agent mode</span>
-              <span className="agent-track" aria-hidden="true">
+            <div className={`agent-switch ${agent ? "on" : ""}`}>
+              <button
+                type="button"
+                className="agent-open"
+                aria-label="Show the agent panel"
+                onClick={() => setDockOpen(true)}
+              >
+                <AgentOrb size={22} active={agentRunning} asleep={!agent} />
+                <span>Agent mode</span>
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={agent}
+                aria-label="Agent mode"
+                className="agent-track"
+                onClick={() => {
+                  if (!agent) setDockOpen(true);
+                  setAgentMode(!agent);
+                }}
+              >
                 <span className="agent-knob" />
-              </span>
-            </button>
+              </button>
+            </div>
             <span className="utility">
               <IconButton label="Reset demo" onClick={reset}>
                 <RotateCcw />

@@ -17,3 +17,19 @@ export const useRequestedShift = () =>
     () => selected,
     () => null,
   );
+
+// Whether the agent's frosted panel is showing. It's separate from Agent mode itself,
+// so the panel can be closed while the agent works and reopened from the top bar.
+let dockOpen = false;
+const dockSubs = new Set<() => void>();
+export function setDockOpen(open: boolean) {
+  if (dockOpen === open) return;
+  dockOpen = open;
+  dockSubs.forEach((f) => f());
+}
+export const useDockOpen = () =>
+  useSyncExternalStore(
+    (f) => (dockSubs.add(f), () => dockSubs.delete(f)),
+    () => dockOpen,
+    () => false,
+  );

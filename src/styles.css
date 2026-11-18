@@ -3233,3 +3233,138 @@ html, body { height: 100%; overflow: hidden; }
   font-weight: 500;
   opacity: 0.75;
 }
+
+/* ===================== Agent pill: open the panel vs. flip the switch ===================== */
+.agent-switch {
+  padding: 0 7px 0 0;
+  gap: 4px;
+  cursor: default;
+}
+.agent-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 100%;
+  padding: 0 8px 0 14px;
+  border-radius: 999px 0 0 999px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.agent-switch .agent-track {
+  cursor: pointer;
+  padding: 0;
+  border: 0;
+}
+.agent-open:focus-visible,
+.agent-switch .agent-track:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.agent-switch.on .agent-open:focus-visible,
+.agent-switch.on .agent-track:focus-visible {
+  outline-color: #fff;
+}
+
+/* ===================== Sleeping buddy ===================== */
+.buddy.asleep {
+  animation: buddy-breathe 3.6s ease-in-out infinite;
+}
+.buddy.asleep::before {
+  animation-duration: 22s;
+  opacity: 0.35;
+}
+.buddy.asleep .buddy-eyes {
+  transform: translate(0, 12%);
+}
+.buddy.asleep .buddy-eye,
+.buddy.waking .buddy-eye {
+  transition: transform 700ms cubic-bezier(0.25, 0.9, 0.3, 1);
+}
+.buddy.waking {
+  animation: buddy-wake 900ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+@keyframes buddy-breathe {
+  50% {
+    transform: scale(0.95);
+  }
+}
+@keyframes buddy-wake {
+  0% {
+    transform: scale(0.94);
+  }
+  55% {
+    transform: scale(1.06) translateY(-1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.buddy-wrap {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+}
+/* Closed eyes: bold, smiling sleepy arcs so it still reads as the agent's face */
+.buddy.asleep .buddy-eyes {
+  gap: 14%;
+}
+.buddy.asleep .buddy-eye,
+.buddy.asleep .buddy-eye.blink {
+  width: 24%;
+  aspect-ratio: 2.1;
+  background: transparent;
+  border: 0 solid #0d1b4d;
+  border-bottom-width: var(--lid, 2px);
+  border-radius: 0 0 999px 999px;
+  transform: none;
+}
+.buddy-z {
+  /* starts right at the buddy's top-right rim, so it rises out of it */
+  position: absolute;
+  z-index: 3;
+  top: 0.15em;
+  right: 0.35em;
+  pointer-events: none;
+  font-size: 1em;
+  font-weight: 800;
+  line-height: 1;
+  color: color-mix(in oklab, var(--brand) 70%, #86d0ff);
+}
+.agent-switch .buddy-z {
+  color: var(--brand);
+}
+.buddy-z i {
+  position: absolute;
+  font-style: normal;
+  opacity: 0;
+  animation: dock-z 2.8s ease-out infinite;
+}
+.buddy-z i:nth-child(2) {
+  animation-delay: 1.4s;
+  font-size: 0.8em;
+}
+@keyframes dock-z {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0.25em) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(0.15em, -0.1em) scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0.55em, -0.9em) scale(1);
+  }
+}
+.agent-dock-head .agent-dock-icon {
+  margin-left: -4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .buddy.asleep,
+  .buddy.waking,
+  .buddy-z i {
+    animation: none !important;
+  }
+}
