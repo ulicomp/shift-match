@@ -2748,7 +2748,6 @@ html, body { height: 100%; overflow: hidden; }
   border-radius: 24px;
   background: linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.82));
   backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
   border: 1px solid rgb(255 255 255 / 0.9);
   box-shadow:
     0 24px 60px -20px rgb(23 25 29 / 0.35),
@@ -3046,7 +3045,6 @@ html, body { height: 100%; overflow: hidden; }
 .agent-dock {
   background: linear-gradient(160deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.48));
   backdrop-filter: blur(26px) saturate(190%) brightness(1.04);
-  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.04);
   border: 1px solid rgb(255 255 255 / 0.85);
   box-shadow:
     0 0 0 1px rgb(23 25 29 / 0.07),

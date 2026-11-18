@@ -5,6 +5,7 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   type RouterHistory,
 } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
@@ -16,7 +17,6 @@ import Dispatch, { shiftsQuery } from "@/features/Dispatch";
 import HowItWorks from "@/features/HowItWorks";
 import AgentReport from "@/features/AgentReport";
 import Shifts, { pastShiftsQuery } from "@/features/Shifts";
-import Simulation from "@/features/Simulation";
 
 function NotFound() {
   return (
@@ -71,7 +71,13 @@ const routeTree = rootRoute.addChildren([
     component: Shifts,
     ...page,
   }),
-  createRoute({ getParentRoute: () => rootRoute, path: "/simulation", component: Simulation }),
+  // Charts only load when the Simulation page is opened.
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/simulation",
+    component: lazyRouteComponent(() => import("@/features/Simulation")),
+    pendingComponent: PageSkeleton,
+  }),
   createRoute({ getParentRoute: () => rootRoute, path: "/agent", component: AgentReport }),
   createRoute({ getParentRoute: () => rootRoute, path: "/how-it-works", component: HowItWorks }),
 ]);
