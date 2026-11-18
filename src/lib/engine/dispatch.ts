@@ -8,7 +8,7 @@ import { hashSeed, mulberry32 } from "./random.ts";
 import { rankShift } from "./ranking.ts";
 import { HOUR, slotOf } from "./time.ts";
 import { sampleOutcome, type DeclineReason, type Outcome } from "./truth.ts";
-import { featuresFor, findCaregiver, recordAnswer, type World } from "./world.ts";
+import { featuresFor, findCaregiver, hardRuleFailure, recordAnswer, type World } from "./world.ts";
 
 interface Outstanding {
   caregiverId: string;
@@ -64,6 +64,7 @@ function fill(w: World, d: LiveDispatch, caregiverId: string, minute: number, ev
   d.state.filledBy = cg.seed.name;
   events.push({ minute, caregiverName: cg.seed.name, action: "accepted", detail: `Filled in ${minute} min` });
   for (const o of d.outstanding) {
+    w.pendingOffers.delete(o.caregiverId);
     d.statuses.set(o.caregiverId, "withdrawn");
     events.push({ minute, caregiverName: name(w, o.caregiverId), action: "withdrawn", detail: "Offer withdrawn · shift filled" });
   }
@@ -101,7 +102,15 @@ export function stepDispatch(w: World, d: LiveDispatch): OfferEvent[] {
     if (!cg) continue;
     // Late answers after the shift is filled don't count.
     if (isFilled(d)) continue;
+    w.pendingOffers.delete(o.caregiverId);
     if (o.outcome.kind === "accept") {
+      // They may have taken another visit since we texted them.
+      const nowBlocked = hardRuleFailure(w, cg, d.shift);
+      if (nowBlocked) {
+        d.statuses.set(o.caregiverId, "declined");
+        events.push({ minute, caregiverName: cg.seed.name, action: "declined", detail: "Said yes, but just took another visit" });
+        continue;
+      }
       recordAnswer(w, cg, o.input, slot, true, true);
       fill(w, d, o.caregiverId, minute, events);
       continue;
@@ -145,6 +154,7 @@ export function stepDispatch(w: World, d: LiveDispatch): OfferEvent[] {
     const target = d.state.strategy === "top3" ? 3 : 1;
     for (const next of after) {
       if (d.outstanding.length >= target) break;
+      if (w.pendingOffers.has(next.caregiverId)) continue; // already has an offer out for another visit
       const cg = findCaregiver(w, next.caregiverId);
       if (!cg) continue;
       const { input, situation } = featuresFor(w, cg, d.shift);
@@ -157,11 +167,13 @@ export function stepDispatch(w: World, d: LiveDispatch): OfferEvent[] {
         dueAt: minute + (outcome.kind === "none" ? d.timeoutMinutes : outcome.afterMinutes),
       });
       cg.offerTimes.push(w.now);
+      w.pendingOffers.set(cg.seed.id, d.shift.id);
       d.statuses.set(cg.seed.id, "offered");
       d.frozenScores.set(cg.seed.id, next.score);
       events.push({ minute, caregiverName: cg.seed.name, action: "sent", detail: `#${next.rank} · ${Math.round(next.score * 100)}% likely` });
     }
-    if (d.outstanding.length === 0) d.state.status = "unfilled";
+    const waitingElsewhere = after.some((c) => w.pendingOffers.has(c.caregiverId));
+    if (d.outstanding.length === 0 && !waitingElsewhere) d.state.status = "unfilled";
   }
   d.state.events.push(...events);
   if (d.state.status === "running") d.state.minute++;

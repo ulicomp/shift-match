@@ -46,6 +46,8 @@ export interface World {
   history: Example[];
   model: TrainedModel;
   shiftCounter: number;
+  /** Caregivers with an offer out right now (any visit), so nobody gets two at once. */
+  pendingOffers: Map<string, string>;
 }
 
 export const findClient = (w: World, id: string) => w.clients.find((c) => c.id === id);
@@ -314,6 +316,7 @@ export function createWorld(now = Date.now(), seed = 20261118): World {
     history: [],
     model: undefined as unknown as TrainedModel,
     shiftCounter: 0,
+    pendingOffers: new Map(),
   };
   const seasonalHours = w.caregivers.map((c) => c.hoursThisWeek);
   generateHistory(w, rng);
