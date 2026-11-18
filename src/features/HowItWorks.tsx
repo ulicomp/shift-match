@@ -42,7 +42,8 @@ export default function HowItWorks() {
           When a caregiver cancels, the coordinator usually calls whoever lives closest, then the next
           person, then the next. Shift Match does that ranking with data: it removes anyone who can't
           legally or practically take the visit, predicts who will actually say yes, sends offers in
-          that order, and learns from every answer.
+          that order, and learns from every answer. Turn on Agent mode and it does all of that for every open
+          visit at once, then hands you a report with only the visits that still need a person.
         </p>
       </section>
       <div className="explanation-grid">
