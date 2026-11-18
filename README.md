@@ -53,7 +53,7 @@ Shift Match turns that into a ranked, explainable, automatic process.
 
 ### 2. A learned chance of "yes"
 
-A logistic regression trained on six weeks of past offers (about 700 yes/no answers, 80/20 holdout). It sees only what an agency can actually observe:
+A logistic regression trained on six weeks of past offers (696 yes/no answers, 80/20 holdout). The history was generated the way most agencies work today, closest caregiver first, so the model has to learn that distance isn't the whole story. It sees only what an agency can actually observe:
 
 | Feature | What it captures |
 | --- | --- |
@@ -66,7 +66,7 @@ A logistic regression trained on six weeks of past offers (about 700 yes/no answ
 | Past acceptance rate | Their own yes rate, smoothed |
 | Time-of-day preference | Do they take mornings, afternoons or evenings more than usual |
 
-The model typically scores an AUC around 0.7 on held-out offers, and the How it works page shows the live weights and metrics. Every answer during a live dispatch is also one online gradient step, so the model keeps learning.
+The model scores an AUC of about 0.66 on offers it never saw, which is realistic for something as noisy as people answering texts. More importantly, it recovers every pattern in the simulated caregivers' hidden behavior with the right sign (distance down, client history up, notice up, near-overtime down) without ever seeing that behavior. The How it works page shows the live weights and metrics. Every answer during a live dispatch is also one online gradient step, so the model keeps learning.
 
 ### 3. Cold start and fairness
 
@@ -99,7 +99,7 @@ The Simulation page replays the same random cancellations against the same simul
 | **Shift Match, top 3** | **3.2** | 3.12 | 85.2% |
 | Random qualified pick | 9.1 | 2.03 | 85.6% |
 
-Ranked one-at-a-time fills more shifts with about 20% fewer texts than a random pick. Top 3 is the fastest when every minute counts, which is exactly when Agent mode uses it.
+Ranked one at a time fills more shifts, 21% faster and with 20% fewer texts than a random qualified pick. Top 3 is the fastest when every minute counts, which is exactly when Agent mode uses it.
 
 <img src="docs/screenshots/simulation.jpg" alt="Simulation: minutes to fill by strategy and offers per caregiver" width="100%" />
 
