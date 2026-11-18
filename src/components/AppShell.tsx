@@ -1,16 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Radar,
   Users,
   CalendarCheck,
   FlaskConical,
   BookOpen,
-  Search,
-  SlidersHorizontal,
-  Bell,
-  Settings,
-  HelpCircle,
+  RotateCcw,
+  Sparkles,
   Plus,
   Menu,
 } from "lucide-react";
@@ -19,15 +17,15 @@ import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import { InitialsAvatar, IconButton } from "./shared";
-import { useGlobalSearch, setGlobalSearch } from "./searchStore";
+import { useEngineVersion } from "./engineStore";
+import { LogCancellationDialog } from "./LogCancellationDialog";
+import { TopStats } from "./TopStats";
+import { installElasticScroll } from "./elasticScroll";
+import { resetDemo } from "@/lib/api";
+import logoUrl from "@/assets/logo.webp";
 
 function LogoMark({ size = 20 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <circle cx="9" cy="12" r="6" />
-      <circle cx="15" cy="12" r="6" />
-    </svg>
-  );
+  return <img src={logoUrl} width={size} height={size} alt="" aria-hidden="true" className="logo-img" />;
 }
 const tabs = [
   { to: "/", label: "Dispatch", icon: Radar },
@@ -39,28 +37,30 @@ const tabs = [
 export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [menu, setMenu] = useState(false);
-  const search = useGlobalSearch();
-  const setSearch = setGlobalSearch;
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [logging, setLogging] = useState(false);
+  // Visual only for now; the agent gets wired up next.
+  const [agent, setAgent] = useState(false);
+  const queryClient = useQueryClient();
+  const version = useEngineVersion();
+  // Any engine change (offer answered, shift filled, new cancellation) refreshes every screen.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
-      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing)) {
-        e.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    if (version) void queryClient.invalidateQueries();
+  }, [version, queryClient]);
   const title = tabs.find((t) => t.to === path)?.label ?? "Page not found";
-  const prototype = () => toast("This is a prototype. No notifications or settings are connected.");
+  useEffect(() => {
+    document.title = `${title} · Shift Match`;
+  }, [title]);
+  useEffect(() => installElasticScroll(), []);
+  const reset = () =>
+    toast("Reset the demo?", {
+      description: "Brings back the original open shifts and clears today's offers.",
+      action: { label: "Reset", onClick: () => resetDemo() },
+    });
   return (
     <div className="app-frame">
       <aside className="rail">
         <Link to="/" className="logo" aria-label="Shift Match home">
-          <LogoMark size={21} />
+          <LogoMark size={48} />
         </Link>
         <nav className="rail-nav" aria-label="Main navigation">
           {tabs.map((t) => (
@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <TooltipTrigger asChild>
                 <Button asChild variant="nav" size="icon">
                   <Link to={t.to} activeOptions={{ exact: true }} aria-label={t.label}>
-                    <t.icon size={18} />
+                    <t.icon size={20} />
                   </Link>
                 </Button>
               </TooltipTrigger>
@@ -77,15 +77,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="rail-bottom">
-        <InitialsAvatar name="Alex Morgan" />
+          <InitialsAvatar name="Alex Morgan" />
         </div>
       </aside>
       <div className="workspace">
         <div className="mobile-menu">
           <Link to="/" className="brand">
-            <span className="logo">
-              <LogoMark size={20} />
-            </span>
+            <LogoMark size={28} />
             Shift Match
           </Link>
           <IconButton label="Open navigation" onClick={() => setMenu(true)}>
@@ -93,73 +91,40 @@ export function AppShell({ children }: { children: ReactNode }) {
           </IconButton>
         </div>
         <header className="top-bar">
-          <div className="page-name">
-            <span className="text-muted-foreground text-[11px]">Shift Match</span>
-            <h1>{title}</h1>
-          </div>
-          <form
-            className="search-pill"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (path !== "/caregivers")
-                toast(
-                  search
-                    ? `Search for “${search}” in the Caregivers tab.`
-                    : "Enter a caregiver or client name.",
-                );
-            }}
-          >
-            <Search size={15} className="text-muted-foreground" />
-            <input
-              ref={searchRef}
-              aria-label="Search caregivers or clients"
-              placeholder="Search caregivers or clients"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <kbd className="search-kbd">⌘K</kbd>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              aria-label="Search filters"
-              onClick={() => toast("Skill and payer filters are available in Caregivers.")}
-              type="button"
-            >
-              <SlidersHorizontal />
-            </Button>
-          </form>
+          <h1 className="sr-only">{title}</h1>
+          <TopStats />
           <div className="toolbar">
-            <span className="prototype">Prototype · mock data</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={agent}
+              className={`agent-switch ${agent ? "on" : ""}`}
+              onClick={() => setAgent((a) => !a)}
+            >
+              <Sparkles />
+              <span>Agent mode</span>
+              <span className="agent-track" aria-hidden="true">
+                <span className="agent-knob" />
+              </span>
+            </button>
             <span className="utility">
-              <IconButton label="Notifications" onClick={prototype}>
-                <Bell />
+              <IconButton label="Reset demo" onClick={reset}>
+                <RotateCcw />
               </IconButton>
             </span>
-            <span className="utility">
-              <IconButton label="Settings" onClick={prototype}>
-                <Settings />
-              </IconButton>
-            </span>
-            <span className="utility">
-              <Button asChild variant="circle" size="icon">
-                <Link to="/how-it-works" aria-label="Help">
-                  <HelpCircle />
-                </Link>
-              </Button>
-            </span>
-            <Button onClick={() => toast("Prototype only — cancellations use local sample data.")}>
+            <Button onClick={() => setLogging(true)}>
               <Plus />
               Log cancellation
             </Button>
           </div>
         </header>
-        <main className="page-content">{children}</main>
+        <main className="page-content" data-elastic>{children}</main>
       </div>
+      <LogCancellationDialog open={logging} onOpenChange={setLogging} />
       <Sheet open={menu} onOpenChange={setMenu}>
         <SheetContent side="left">
           <SheetTitle>Shift Match</SheetTitle>
-          <SheetDescription>Miami Home Care</SheetDescription>
+          <SheetDescription>Miami home care agency · demo</SheetDescription>
           <nav className="nav-sheet" aria-label="Mobile navigation">
             {tabs.map((t) => (
               <Button key={t.to} asChild variant="nav">
