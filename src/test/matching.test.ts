@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  agentFinished,
   configureEngine,
+  getAgent,
   getCaregivers,
   getClients,
   getDispatch,
@@ -12,6 +14,7 @@ import {
   resetDemo,
   runSimulation,
   sendOffers,
+  setAgentMode,
 } from "@/lib/api";
 import { slotsCovered } from "@/lib/engine/time";
 import { toLocalIso } from "@/lib/engine/time";
@@ -169,5 +172,64 @@ describe("simulation", () => {
     }
     const [sequential, , random] = result;
     expect(sequential?.avgOffersPerShift).toBeLessThan(random?.avgOffersPerShift ?? 0);
+  });
+});
+
+describe("agent mode", () => {
+  it("handles every open visit and explains each strategy", async () => {
+    const open = await getShifts();
+    setAgentMode(true);
+    await agentFinished();
+    const run = getAgent().run;
+    expect(run?.status).toBe("done");
+    expect(run?.visits).toHaveLength(open.length);
+    for (const v of run?.visits ?? []) {
+      expect(["filled", "escalated"]).toContain(v.status);
+      if (v.status === "filled") expect(v.filledBy).toBeTruthy();
+      else expect(v.escalation).toBeTruthy();
+      if (v.strategy) {
+        expect(v.why.length).toBeGreaterThan(10);
+        if (v.noticeHours < 12 && v.qualified > 1) expect(v.strategy).toBe("top3");
+      }
+    }
+  });
+
+  it("never books one caregiver into two overlapping visits", async () => {
+    setAgentMode(true);
+    await agentFinished();
+    const fills = (getAgent().run?.visits ?? []).filter((v) => v.filledBy);
+    for (const a of fills)
+      for (const b of fills)
+        if (a !== b && a.filledBy === b.filledBy) expect(a.start < b.end && b.start < a.end).toBe(false);
+  });
+
+  it("reports hour changes that match what it filled", async () => {
+    setAgentMode(true);
+    await agentFinished();
+    const run = getAgent().run;
+    const filledBy = (run?.visits ?? []).filter((v) => v.filledBy).map((v) => v.filledBy);
+    for (const c of run?.changes ?? []) {
+      expect(filledBy).toContain(c.caregiverName);
+      expect(c.hoursAfter).toBeGreaterThan(c.hoursBefore);
+      expect(c.hoursAfter).toBeLessThanOrEqual(c.maxWeeklyHours);
+    }
+    expect((await getShifts()).length).toBe((run?.visits ?? []).filter((v) => v.status !== "filled").length);
+  });
+
+  it("picks up a cancellation logged while it is on", async () => {
+    setAgentMode(true);
+    await agentFinished();
+    const [client] = await getClients();
+    if (!client) throw new Error("no clients");
+    await logCancellation({
+      clientId: client.id,
+      start: toLocalIso(new Date(NOW + 30 * 3_600_000)),
+      durationHours: 3,
+      requiredSkills: client.careNeeds,
+      cancelledBy: null,
+    });
+    await agentFinished();
+    const run = getAgent().run;
+    expect(run?.visits.some((v) => v.clientName === client.name && v.status !== "queued")).toBe(true);
   });
 });

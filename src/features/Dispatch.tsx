@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { getDispatch, getShifts, rankNow, sendOffers } from "@/lib/api";
+import { getAgent, getDispatch, getShifts, rankNow, sendOffers } from "@/lib/api";
 import type { Shift, Strategy } from "@/lib/types";
 import { ColHead, OfferWidgets, RankedCandidates, ShiftCard } from "@/components/DispatchCards";
 import { Badge } from "@/components/shared";
@@ -36,6 +36,22 @@ export default function Dispatch() {
     // version: re-evaluate when the engine changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, version]);
+
+  // While the agent runs, follow the visit it's working on, until the coordinator picks one.
+  const agentRun = getAgent().run;
+  const [followRun, setFollowRun] = useState<number | null>(null);
+  const following = agentRun?.status === "running" && followRun !== -agentRun.id;
+  const latestAgentVisit = following ? [...(agentRun?.log ?? [])].reverse().find((l) => l.shiftId)?.shiftId : undefined;
+  useEffect(() => {
+    if (latestAgentVisit && latestAgentVisit !== selected) setSelected(latestAgentVisit);
+  }, [latestAgentVisit, selected]);
+  useEffect(() => {
+    if (agentRun && followRun !== agentRun.id && followRun !== -agentRun.id) setFollowRun(agentRun.id);
+  }, [agentRun, followRun]);
+  const pick = (id: string) => {
+    setSelected(id);
+    if (agentRun?.status === "running") setFollowRun(-agentRun.id); // stop following
+  };
 
   const shift = list.find((s) => s.id === selected) ?? list[0];
 
@@ -93,7 +109,7 @@ export default function Dispatch() {
               shift={s}
               key={s.id}
               selected={shift.id === s.id}
-              onSelect={() => setSelected(s.id)}
+              onSelect={() => pick(s.id)}
               dispatch={s.id === shift.id ? dispatch : getDispatch(s.id)}
             />
           ))}

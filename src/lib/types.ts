@@ -137,3 +137,57 @@ export interface ModelInfo {
   onlineUpdates: number;
   features: ModelFeatureInfo[];
 }
+
+export type AgentVisitStatus = "queued" | "running" | "filled" | "escalated" | "skipped";
+
+export interface AgentVisit {
+  shiftId: string;
+  clientName: string;
+  title: string;
+  start: string;
+  end: string;
+  noticeHours: number;
+  qualified: number;
+  strategy: Strategy | null;
+  why: string;
+  status: AgentVisitStatus;
+  filledBy: string | null;
+  minutes: number | null;
+  offers: number;
+  declines: number;
+  escalation: string | null;
+}
+
+export interface AgentLogEntry {
+  id: number;
+  minute: number;
+  shiftId: string | null;
+  clientName: string | null;
+  kind: "plan" | "sent" | "declined" | "no_response" | "reranked" | "accepted" | "escalated" | "info" | "done";
+  text: string;
+}
+
+export interface AgentChange {
+  caregiverName: string;
+  hoursBefore: number;
+  hoursAfter: number;
+  maxWeeklyHours: number;
+  visits: string[];
+}
+
+export interface AgentRun {
+  id: number;
+  status: "running" | "stopping" | "done";
+  startedAt: string;
+  finishedAt: string | null;
+  elapsedMinutes: number;
+  visits: AgentVisit[];
+  log: AgentLogEntry[];
+  changes: AgentChange[];
+  offersPerCaregiver: { name: string; offers: number }[];
+}
+
+export interface AgentState {
+  on: boolean;
+  run: AgentRun | null;
+}

@@ -20,6 +20,7 @@ Today a coordinator handles a call-out by phoning whoever lives closest, then th
 4. **Fairness.** People asked more than the team's median this week get a small penalty, so the same three people don't get every text.
 5. **Live dispatch.** Send offers one at a time (next best gets it after a decline or 8–15 min of silence) or to the top 3 at once (first yes wins, the next in line backfills). Each decline comes back with a reason. "Too far" makes distance weigh more for this visit, "time doesn't work" boosts time-of-day fit, and the list re-ranks before the next offer goes out. Every answer is also one more training example for the model.
 6. **Log a cancellation** from the top bar and it's ranked the moment you save.
+7. **Agent mode** takes over the whole loop. Flip the switch in the top bar and the agent works through every open visit, most urgent first, up to three at a time. For each visit it picks the strategy and says why (under 12 h of notice it texts the top 3 at once, otherwise one at a time), runs the live dispatch, never texts or books the same person for two visits at once, and escalates anything it can't cover with the reason. New cancellations logged while it's on are picked up automatically. When it's done it opens the **Agent report**: visits covered, time from start to last reply, texts sent, what needs a human, whose hours changed, and how evenly offers were spread.
 
 The **Simulation** tab replays hundreds of random cancellations against the same simulated caregivers under three strategies (Shift Match one at a time, Shift Match top 3, random qualified pick) and compares minutes to fill, offers per shift, fill rate and how evenly offers are spread.
 
@@ -41,7 +42,7 @@ Requires Node 20.19 or newer.
 ```
 src/
   lib/
-    api.ts            the only module the UI calls; swap these functions for fetch() to add a backend
+    api.ts            the only module the UI calls (data, live dispatch, agent mode); swap for fetch() to add a backend
     types.ts          shared types
     mock.ts           seed data: clients, caregivers, skills, availability, coordinates
     engine/
@@ -52,7 +53,7 @@ src/
       dispatch.ts     live offer loop that learns from answers and re-ranks
       simulation.ts   strategy comparison
       truth.ts        simulated caregiver behavior (the "real people")
-  features/           Dispatch, Caregivers, Shifts, Simulation, How it works pages
+  features/           Dispatch, Caregivers, Shifts, Simulation, Agent report, How it works pages
   components/         app shell, cards, dialog, shared UI
 ```
 

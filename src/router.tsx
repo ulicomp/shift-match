@@ -14,6 +14,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Caregivers, { caregiversQuery } from "@/features/Caregivers";
 import Dispatch, { shiftsQuery } from "@/features/Dispatch";
 import HowItWorks from "@/features/HowItWorks";
+import AgentReport from "@/features/AgentReport";
 import Shifts, { pastShiftsQuery } from "@/features/Shifts";
 import Simulation from "@/features/Simulation";
 
@@ -71,6 +72,7 @@ const routeTree = rootRoute.addChildren([
     ...page,
   }),
   createRoute({ getParentRoute: () => rootRoute, path: "/simulation", component: Simulation }),
+  createRoute({ getParentRoute: () => rootRoute, path: "/agent", component: AgentReport }),
   createRoute({ getParentRoute: () => rootRoute, path: "/how-it-works", component: HowItWorks }),
 ]);
 
