@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src/assets/logo.webp" alt="Shift Match logo" width="72" />
+<img src="src/assets/logo-github.webp" alt="Shift Match logo" width="88" />
 
 # Shift Match
 
@@ -36,7 +36,7 @@ Shift Match turns that into a ranked, explainable, automatic process.
 
 **Agent mode.** Flip the switch and the agent takes over the whole loop: it works through every open visit, most urgent first and up to three at a time, picks the strategy for each one and says why, handles every reply, and escalates only what it cannot cover. When it is done it hands you a report.
 
-<img src="docs/screenshots/agent-report.jpg" alt="Agent report: visits covered, time, texts sent, what needs a person" width="100%" />
+<img src="docs/screenshots/agent-mode.png" alt="Agent mode: the agent covering cancelled visits live from the Dispatch page" width="100%" />
 
 ## How it decides
 
