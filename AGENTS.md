@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Application structure
+- Keep TanStack Router file routes and shared shell in the root route; this preserves the platform runtime and typed navigation.
+- All feature data must be fetched through the six asynchronous exports in `src/lib/api.ts`; mock generation, ranking, and simulation remain outside components so a future data source can replace the adapter.
+- Prototype offers update an in-memory filled-shift collection, not persistent storage; the requested experience has no backend.
