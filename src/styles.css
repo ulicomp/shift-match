@@ -706,8 +706,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 340px;
-  overflow: auto;
 }
 .timeline-item {
   display: flex;
@@ -1329,3 +1327,6 @@ html, body { height: 100%; overflow: hidden; }
   .page-content { padding: 12px; }
   .search-kbd { display: none; }
 }
+
+.widget-column { scrollbar-width: thin; padding-bottom: 4px; }
+.widget-column > .panel { flex-shrink: 0; }

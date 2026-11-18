@@ -323,7 +323,7 @@ export function OfferWidgets({
             ))
           )}
           {accepted && (
-            <div className="filled-tile">
+            <div className="filled-tile" ref={(el) => el?.scrollIntoView({ behavior: "smooth", block: "nearest" })}>
               <span className="big-number">
                 {accepted.minute} <span className="text-2xl">min</span>
               </span>

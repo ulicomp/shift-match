@@ -6,7 +6,6 @@ import {
   CalendarCheck,
   FlaskConical,
   BookOpen,
-  Command,
   Search,
   SlidersHorizontal,
   Bell,
@@ -20,6 +19,16 @@ import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import { InitialsAvatar, IconButton } from "./shared";
+import { useGlobalSearch, setGlobalSearch } from "./searchStore";
+
+function LogoMark({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <circle cx="9" cy="12" r="6" />
+      <circle cx="15" cy="12" r="6" />
+    </svg>
+  );
+}
 const tabs = [
   { to: "/", label: "Dispatch", icon: Radar },
   { to: "/caregivers", label: "Caregivers", icon: Users },
@@ -30,7 +39,8 @@ const tabs = [
 export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [menu, setMenu] = useState(false);
-  const [search, setSearch] = useState("");
+  const search = useGlobalSearch();
+  const setSearch = setGlobalSearch;
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -50,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-frame">
       <aside className="rail">
         <Link to="/" className="logo" aria-label="Shift Match home">
-          <Command size={21} />
+          <LogoMark size={21} />
         </Link>
         <nav className="rail-nav" aria-label="Main navigation">
           {tabs.map((t) => (
@@ -67,9 +77,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="rail-bottom">
-        <IconButton label="Agency profile" onClick={() => toast("Miami Home Care · dispatch team")}>
-          <Users />
-        </IconButton>
         <InitialsAvatar name="Alex Morgan" />
         </div>
       </aside>
@@ -77,7 +84,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mobile-menu">
           <Link to="/" className="brand">
             <span className="logo">
-              <Command size={20} />
+              <LogoMark size={20} />
             </span>
             Shift Match
           </Link>
@@ -94,11 +101,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             className="search-pill"
             onSubmit={(e) => {
               e.preventDefault();
-              toast(
-                search
-                  ? `Search for “${search}” in the Caregivers tab.`
-                  : "Enter a caregiver or client name.",
-              );
+              if (path !== "/caregivers")
+                toast(
+                  search
+                    ? `Search for “${search}” in the Caregivers tab.`
+                    : "Enter a caregiver or client name.",
+                );
             }}
           >
             <Search size={15} className="text-muted-foreground" />

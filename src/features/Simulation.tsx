@@ -186,9 +186,12 @@ export default function Simulation() {
                       dataKey="name"
                       tickFormatter={(n: string) => String(n).split(" ")[0] ?? ""}
                       tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
+                      angle={-35}
+                      textAnchor="end"
+                      height={44}
                       axisLine={false}
                       tickLine={false}
-                      interval={3}
+                      interval={0}
                     />
                     <YAxis
                       tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}

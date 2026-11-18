@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Search, ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check } from "lucide-react";
 import { getCaregivers, getShifts, getPastShifts } from "@/lib/api";
 import type { Caregiver } from "@/lib/types";
 import { InitialsAvatar, Badge, ScoreBar, StatBubble } from "@/components/shared";
+import { useGlobalSearch } from "@/components/searchStore";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 export const caregiversQuery = { queryKey: ["caregivers"], queryFn: getCaregivers };
@@ -11,7 +12,7 @@ export default function Caregivers() {
   const { data } = useSuspenseQuery(caregiversQuery);
   const { data: shifts } = useSuspenseQuery({ queryKey: ["open-shifts"], queryFn: getShifts });
   const { data: past } = useSuspenseQuery({ queryKey: ["past-shifts"], queryFn: getPastShifts });
-  const [search, setSearch] = useState("");
+  const search = useGlobalSearch();
   const [skill, setSkill] = useState("");
   const [payer, setPayer] = useState("");
   const [sort, setSort] = useState("name");
@@ -49,15 +50,6 @@ export default function Caregivers() {
           Caregiver directory{" "}
           <span className="text-muted-foreground text-xs ml-2">{rows.length} caregivers</span>
         </h2>
-        <div className="search-pill">
-          <Search size={16} />
-          <input
-            aria-label="Search caregiver directory"
-            placeholder="Search caregivers"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
         <select
           className="select-pill"
           aria-label="Skill filter"
