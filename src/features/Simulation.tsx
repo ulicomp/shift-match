@@ -9,6 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Cell,
+  LabelList,
 } from "recharts";
 import { runSimulation } from "@/lib/api";
 import type { SimulationResult } from "@/lib/types";
@@ -33,6 +35,14 @@ export default function Simulation() {
   const fairness = results[strategy]?.offersPerCaregiver ?? [];
   const average = fairness.reduce((n, c) => n + c.offers, 0) / Math.max(1, fairness.length);
   const colors = ["var(--brand)", "var(--primary)", "var(--chart-gray)"];
+  // One row per strategy, so each bar is hovered on its own.
+  const fillTimes = ["One at a time", "Top 3", "Random"].map((name, i) => ({
+    name,
+    minutes: results[i]?.avgMinutesToFill ?? 0,
+    fill: colors[i] ?? "var(--primary)",
+    // light bars get dark text, dark bars get white text
+    ink: i === 2 ? "var(--foreground)" : "#fff",
+  }));
   return (
     <>
       <section className="panel">
@@ -112,17 +122,7 @@ export default function Simulation() {
             <>
               <div className="chart-area">
                 <ResponsiveContainer>
-                  <BarChart
-                    data={[
-                      {
-                        name: "Average fill time",
-                        sequential: results[0]?.avgMinutesToFill ?? 0,
-                        top3: results[1]?.avgMinutesToFill ?? 0,
-                        random: results[2]?.avgMinutesToFill ?? 0,
-                      },
-                    ]}
-                    barGap={16}
-                  >
+                  <BarChart data={fillTimes} barCategoryGap="22%">
                     <CartesianGrid vertical={false} stroke="var(--border)" />
                     <XAxis
                       dataKey="name"
@@ -135,17 +135,22 @@ export default function Simulation() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<ChartTooltip />} />
-                    {["sequential", "top3", "random"].map((key, i) => (
-                      <Bar
-                        key={key}
-                        dataKey={key}
-                        name={["One at a time", "Top 3", "Random"][i] ?? key}
-                        fill={colors[i] ?? "var(--primary)"}
-                        radius={[8, 8, 0, 0]}
-                        maxBarSize={66}
+                    <Tooltip content={<ChartTooltip unit="min" />} cursor={barCursor} />
+                    <Bar
+                      dataKey="minutes"
+                      name="Average fill time"
+                      radius={[10, 10, 0, 0]}
+                      maxBarSize={88}
+                      activeBar={{ fillOpacity: 0.88 }}
+                    >
+                      {fillTimes.map((d) => (
+                        <Cell key={d.name} fill={d.fill} />
+                      ))}
+                      <LabelList
+                        dataKey="minutes"
+                        content={<BarValue data={fillTimes} />}
                       />
-                    ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -207,7 +212,7 @@ export default function Simulation() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<ChartTooltip />} />
+                    <Tooltip content={<ChartTooltip />} cursor={barCursor} />
                     <ReferenceLine
                       y={average}
                       stroke="var(--muted-foreground)"
@@ -242,14 +247,50 @@ function Empty() {
     </div>
   );
 }
+const barCursor = { fill: "rgb(23 25 29 / 0.035)", radius: 12 };
+function BarValue({
+  data,
+  x,
+  y,
+  width,
+  height,
+  value,
+  index,
+}: {
+  data: { ink: string }[];
+  x?: number | string;
+  y?: number | string;
+  width?: number | string;
+  height?: number | string;
+  value?: number | string;
+  index?: number;
+}) {
+  const [bx, by, bw, bh] = [x, y, width, height].map(Number) as [number, number, number, number];
+  if (!bw || value === undefined) return null;
+  const inside = bh >= 34;
+  return (
+    <text
+      x={bx + bw / 2}
+      y={inside ? by + 22 : by - 8}
+      textAnchor="middle"
+      className="bar-value"
+      fill={inside ? (data[index ?? 0]?.ink ?? "#fff") : "var(--foreground)"}
+    >
+      {value}
+      <tspan className="bar-unit"> min</tspan>
+    </text>
+  );
+}
 function ChartTooltip({
   active,
   payload,
   label,
+  unit,
 }: {
   active?: boolean;
   payload?: { name?: string; value?: number | string }[];
   label?: string | number;
+  unit?: string;
 }) {
   if (!active || !payload?.length) return null;
   return (
@@ -258,6 +299,7 @@ function ChartTooltip({
       {payload.map((p, i) => (
         <p className="mt-2" key={i}>
           {p.name}: {p.value}
+          {unit ? ` ${unit}` : ""}
         </p>
       ))}
     </div>
