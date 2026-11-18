@@ -1,198 +1,208 @@
-import {
-  ArrowUpRight,
-  Clock,
-  Send,
-  UserRound,
-  Users,
-  Check,
-  RefreshCw,
-  History,
-  MapPin,
-  Filter,
-} from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import type { Shift, Candidate, RankResult, OfferEvent } from "@/lib/types";
+import type { ReactNode } from "react";
+import { Check, RotateCcw, Send, Users, UserX } from "lucide-react";
+import type { Candidate, DispatchState, OfferEvent, RankResult, Shift, Strategy } from "@/lib/types";
 import { Button } from "./ui/button";
-import {
-  InitialsAvatar,
-  Badge,
-  StatBubble,
-  ScoreBar,
-  ReasonChip,
-  CardFooter,
-  IconButton,
-  ArrowButton,
-  shortDate,
-  time,
-} from "./shared";
+import { Badge, InitialsAvatar, ReasonChip, ScoreBar, isWarningReason, noticeLabel, time } from "./shared";
+
+const dayLabel = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const diff = Math.round(
+    (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
+      new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) /
+      86_400_000,
+  );
+  return diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+};
+const when = (s: Shift) => `${dayLabel(s.start)} ${time(s.start)} – ${time(s.end)}`;
+const firstName = (name: string | null | undefined) => {
+  if (!name) return "";
+  const [f, l] = name.split(" ");
+  return l ? `${f} ${l[0]}.` : (f ?? "");
+};
+
+export function ColHead({
+  step,
+  title,
+  hint,
+  extra,
+  action,
+}: {
+  step: number;
+  title: string;
+  hint: ReactNode;
+  extra?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="col-head">
+      <span className="step-dot">{step}</span>
+      <div className="step-text">
+        <h2>
+          {title}
+          {extra}
+        </h2>
+        <p>{hint}</p>
+      </div>
+      {action}
+    </header>
+  );
+}
+
 export function ShiftCard({
   shift,
   selected,
   onSelect,
-  count,
+  dispatch,
 }: {
   shift: Shift;
   selected: boolean;
   onSelect: () => void;
-  count?: number | undefined;
+  dispatch: DispatchState | null;
 }) {
+  const status = dispatch?.status;
   return (
     <Button variant="shift" size="card" aria-pressed={selected} onClick={onSelect}>
       <div className="shift-top">
         <InitialsAvatar name={shift.clientName} />
-        <span className="client-name">
-          {shift.clientName.split(" ")[0]}
-          <br />
-          {shift.clientName.split(" ").slice(1).join(" ")}
-        </span>
-        <span className="arrow-circle">
-          <ArrowUpRight />
-        </span>
+        <span className="client-name">{shift.clientName}</span>
       </div>
-      <h3>
-        {shift.requiredSkills.includes("Dementia care")
-          ? "Morning personal care"
-          : shift.requiredSkills.includes("Spanish speaking")
-            ? "Afternoon home visit"
-            : "Medication & meal support"}
-      </h3>
+      <h3>{shift.title}</h3>
       <p className="date">
-        {new Date(shift.start).toLocaleDateString("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        })}
-        <br />
-        {time(shift.start)} – {time(shift.end)}
+        {when(shift)} · {shift.neighborhood}
       </p>
-      <div className="tags">
-        {shift.requiredSkills.map((s) => (
-          <Badge key={s}>{s}</Badge>
-        ))}
-      </div>
       <div className="shift-bottom">
-        {selected ? (
-          <>
-            <StatBubble value={`${shift.noticeHours} h`} label="notice" />
-            <StatBubble value={count ?? "—"} label="qualified" />
-            <Badge tone="neutral">Ranking ready</Badge>
-          </>
+        {status === "filled" ? (
+          <Badge tone="green">
+            <Check size={11} /> Filled by {firstName(dispatch?.filledBy)}
+          </Badge>
+        ) : status === "running" ? (
+          <Badge tone="green">
+            <span className="live-dot" /> Offers out
+          </Badge>
+        ) : status === "unfilled" ? (
+          <Badge tone="urgent">Nobody accepted</Badge>
         ) : (
-          <>
-            <Badge tone="neutral">{shift.payer}</Badge>
-            <Badge tone={shift.noticeHours < 12 ? "urgent" : "gray"}>
-              notice: {shift.noticeHours} hours
-            </Badge>
-          </>
+          <Badge tone={shift.noticeHours < 12 ? "urgent" : "gray"}>{noticeLabel(shift.noticeHours)} notice</Badge>
+        )}
+        {shift.cancelledByName && (
+          <span className="cancelled-by">
+            <UserX /> {firstName(shift.cancelledByName)} cancelled
+          </span>
         )}
       </div>
     </Button>
   );
 }
-export function CandidateRow({ candidate }: { candidate: Candidate }) {
+
+const STATUS_BADGE: Record<Candidate["status"], { label: string; tone: "gray" | "green" } | null> = {
+  ready: null,
+  offered: { label: "Offer out", tone: "green" },
+  declined: { label: "Declined", tone: "gray" },
+  no_response: { label: "No reply", tone: "gray" },
+  accepted: { label: "Accepted", tone: "green" },
+  withdrawn: { label: "Withdrawn", tone: "gray" },
+};
+
+/** Two chips at most: the best reason, plus a warning if there is one. */
+function pickReasons(reasons: string[]) {
+  const flags = reasons.filter((r) => isWarningReason(r) || r.startsWith("New") || r.startsWith("Little history"));
+  const good = reasons.filter((r) => !flags.includes(r));
+  return [...good.slice(0, flags.length ? 1 : 2), ...flags.slice(0, 1)];
+}
+
+export function CandidateRow({ candidate, best }: { candidate: Candidate; best: boolean }) {
+  const badge = STATUS_BADGE[candidate.status];
+  const done = candidate.rank === 0;
   return (
-    <div className={`candidate ${candidate.rank === 1 ? "best" : ""}`}>
+    <div className={`candidate ${best ? "best" : ""} ${done ? "done" : ""} status-${candidate.status}`}>
       <div className="candidate-top">
-        <span className="rank-num">#{candidate.rank}</span>
+        <span className="rank-num">{done ? "–" : candidate.rank}</span>
         <InitialsAvatar name={candidate.name} />
         <div className="candidate-name">
-          <h3>{candidate.name}</h3>
-          {candidate.servedClientBefore && <Badge tone="neutral">Served this client before</Badge>}
+          <h3>
+            {candidate.name}
+            {badge && (
+              <Badge tone={badge.tone}>
+                {candidate.status === "offered" && <span className="live-dot" />}
+                {badge.label}
+              </Badge>
+            )}
+          </h3>
+          <p className="candidate-meta">
+            {candidate.distanceMiles} mi · {candidate.hoursThisWeek}/{candidate.maxWeeklyHours} h this week
+          </p>
         </div>
-        <span className="score">{candidate.score.toFixed(2)}</span>
+        <span className="score" title="Predicted chance they accept">
+          {Math.round(candidate.score * 100)}
+          <small>%</small>
+        </span>
       </div>
       <ScoreBar value={candidate.score} />
-      <p className="candidate-meta">
-        {candidate.distanceMiles} mi <span className="mx-2">·</span> {candidate.hoursThisWeek} /{" "}
-        {candidate.maxWeeklyHours} h this week
-      </p>
-      <div className="reason-chips">
-        {candidate.reasons.map((r) => (
-          <ReasonChip key={r} reason={r} />
-        ))}
-      </div>
+      {!done && (
+        <div className="reason-chips">
+          {pickReasons(candidate.reasons).map((r) => (
+            <ReasonChip key={r} reason={r} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-export function RankedCandidates({
-  shift,
-  rank,
-  rerank,
-  busy,
-}: {
-  shift: Shift;
-  rank: RankResult;
-  rerank: () => void;
-  busy: boolean;
-}) {
-  const jump = () =>
-    document
-      .getElementById("candidate-list")
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+export function RankedCandidates({ shift, rank }: { shift: Shift; rank: RankResult }) {
+  const inLine = rank.candidates.filter((c) => c.rank > 0);
+  const asked = rank.candidates.filter((c) => c.rank === 0);
   return (
-    <section className="panel ranked-panel">
-      <div className="rank-header">
-        <Badge>
-          {shift.payer} · {shift.requiredSkills.at(-1)}
-        </Badge>
-        <span>{shortDate(shift.start)}, 2026</span>
-        <ArrowButton label="View ranked candidates" onClick={jump} />
-      </div>
-      <div className="client-hero">
+    <section className="panel ranked-panel" data-elastic>
+      <div className="client-row">
         <div className="hero-avatar">
-          <InitialsAvatar name={shift.clientName} large />
-          <span className="payer-dot">{shift.payer[0]}</span>
+          <InitialsAvatar name={shift.clientName} />
+          <span className="payer-dot" title={`${shift.payer} payer`}>
+            {shift.payer[0]}
+          </span>
         </div>
-        <h2>{shift.clientName}</h2>
-        <p>Cancelled shift · 4 h window</p>
+        <div className="client-row-text">
+          <h2>{shift.clientName}</h2>
+          <p>
+            Needs {shift.requiredSkills.join(" + ")} · {when(shift)} · {shift.neighborhood}
+          </p>
+        </div>
       </div>
-      <div className="hero-actions">
-        <Button variant="secondary" size="sm" disabled={busy} onClick={rerank}>
-          <RefreshCw className={busy ? "animate-spin" : ""} />
-          Re-rank
-        </Button>
-        <IconButton label="Distance" onClick={jump}>
-          <MapPin />
-        </IconButton>
-        <IconButton label="Weekly hours" onClick={jump}>
-          <Clock />
-        </IconButton>
-        <IconButton label="Past visits" onClick={jump}>
-          <History />
-        </IconButton>
-        <IconButton
-          label="Filtered out"
-          onClick={() => {
-            const el = document.getElementById("filtered");
-            if (el instanceof HTMLDetailsElement) {
-              el.open = true;
-              el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            }
-          }}
-        >
-          <Filter />
-        </IconButton>
-      </div>
-      <div className="rank-heading">
-        <h2>Ranked candidates</h2>
-        <span>{rank.candidates.length} qualified · best match first</span>
-      </div>
+      {rank.candidates.length === 0 && (
+        <div className="inner-tile empty-tile">
+          <Users size={22} />
+          <p>Nobody passes the rules for this visit. Open “Filtered out” below to see why.</p>
+        </div>
+      )}
       <div className="candidate-list" id="candidate-list">
-        {rank.candidates.slice(0, 5).map((c) => (
-          <CandidateRow key={c.caregiverId} candidate={c} />
+        {inLine.slice(0, 5).map((c, i) => (
+          <CandidateRow key={c.caregiverId} candidate={c} best={i === 0} />
         ))}
       </div>
-      {rank.candidates.length > 5 && (
+      {inLine.length > 5 && (
         <details className="filtered">
-          <summary>View {rank.candidates.length - 5} more candidates</summary>
+          <summary>
+            {inLine.length - 5} more candidate{inLine.length - 5 === 1 ? "" : "s"}
+          </summary>
           <div className="candidate-list">
-            {rank.candidates.slice(5).map((c) => (
-              <CandidateRow key={c.caregiverId} candidate={c} />
+            {inLine.slice(5).map((c) => (
+              <CandidateRow key={c.caregiverId} candidate={c} best={false} />
             ))}
           </div>
         </details>
       )}
-      <details className="filtered" id="filtered">
+      {asked.length > 0 && (
+        <details className="filtered" open>
+          <summary>Already asked ({asked.length})</summary>
+          <div className="candidate-list">
+            {asked.map((c) => (
+              <CandidateRow key={c.caregiverId} candidate={c} best={false} />
+            ))}
+          </div>
+        </details>
+      )}
+      <details className="filtered">
         <summary>Filtered out ({rank.filteredOut.length})</summary>
         {rank.filteredOut.map((c) => (
           <div className="filtered-item" key={c.caregiverId}>
@@ -205,166 +215,129 @@ export function RankedCandidates({
     </section>
   );
 }
-export function StrategyPicker({
-  strategy,
-  onChange,
-  disabled,
-}: {
-  strategy: "sequential" | "top3";
-  onChange: (value: "sequential" | "top3") => void;
-  disabled: boolean;
-}) {
+
+const STRATEGIES: { value: Strategy; label: string; explain: string }[] = [
+  { value: "sequential", label: "One at a time", explain: "Texts the best match first. If they say no, the next one gets it." },
+  { value: "top3", label: "Top 3 at once", explain: "Texts the top 3 together. First yes wins, the next in line backfills." },
+];
+
+const ACTION_BADGE: Partial<Record<OfferEvent["action"], { label: string; tone: "gray" | "green" }>> = {
+  declined: { label: "Declined", tone: "gray" },
+  no_response: { label: "No reply", tone: "gray" },
+  accepted: { label: "Accepted", tone: "green" },
+  withdrawn: { label: "Withdrawn", tone: "gray" },
+};
+
+function TimelineItem({ e }: { e: OfferEvent }) {
+  const badge = ACTION_BADGE[e.action];
   return (
-    <div className="strategy-options">
-      <Button
-        variant="tile"
-        size="card"
-        disabled={disabled}
-        aria-pressed={strategy === "sequential"}
-        onClick={() => onChange("sequential")}
-      >
-        <UserRound />
-        <strong>One at a time</strong>
-        <p>
-          Next best gets it
-          <br />
-          if they decline
-        </p>
-      </Button>
-      <Button
-        variant="tile"
-        size="card"
-        disabled={disabled}
-        aria-pressed={strategy === "top3"}
-        onClick={() => onChange("top3")}
-      >
-        <Users />
-        <strong>Top 3 at once</strong>
-        <p>
-          First to accept
-          <br />
-          wins
-        </p>
-      </Button>
+    <div className={`timeline-item action-${e.action}`}>
+      <span className="minute">{e.minute}m</span>
+      {e.action === "reranked" ? (
+        <span className="rerank-icon">
+          <RotateCcw size={12} />
+        </span>
+      ) : (
+        <InitialsAvatar name={e.caregiverName} small />
+      )}
+      <p>
+        {e.action === "sent" ? `Texted ${e.caregiverName}` : e.action === "reranked" ? "List re-ranked" : e.caregiverName}
+        {e.detail && <small>{e.detail}</small>}
+      </p>
+      {badge && <Badge tone={badge.tone}>{badge.label}</Badge>}
     </div>
   );
 }
+
 export function OfferWidgets({
-  shift,
   rank,
   strategy,
   onStrategy,
   onSend,
-  events,
-  sending,
-  complete,
+  dispatch,
 }: {
-  shift: Shift;
   rank: RankResult;
-  strategy: "sequential" | "top3";
-  onStrategy: (s: "sequential" | "top3") => void;
+  strategy: Strategy;
+  onStrategy: (s: Strategy) => void;
   onSend: () => void;
-  events: OfferEvent[];
-  sending: boolean;
-  complete: boolean;
+  dispatch: DispatchState | null;
 }) {
-  const accepted = events.find((e) => e.action === "accepted");
+  const status = dispatch?.status;
+  const running = status === "running";
+  const filled = status === "filled";
+  const events = dispatch?.events ?? [];
+  const offers = events.filter((e) => e.action === "sent").length;
+  const canSend = !running && !filled && rank.candidates.some((c) => c.status === "ready");
+  const chosen = STRATEGIES.find((s) => s.value === strategy) ?? STRATEGIES[0];
   return (
-    <aside className="widget-column">
-      <section className="panel">
-        <div className="panel-head">
-          <h2 className="panel-title">
-            <Send />
-            Send offers
-          </h2>
-          <ArrowButton label="Send ranked offers" onClick={onSend} />
+    <aside className="widget-column" data-elastic>
+      <section className="panel send-panel">
+        <div className="segmented" role="radiogroup" aria-label="How to send offers">
+          <span
+            className="segmented-thumb"
+            aria-hidden="true"
+            style={{ transform: `translateX(${strategy === "top3" ? "100%" : "0"})` }}
+          />
+          {STRATEGIES.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              role="radio"
+              aria-checked={strategy === s.value}
+              disabled={running || filled}
+              onClick={() => onStrategy(s.value)}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
-        <StrategyPicker strategy={strategy} onChange={onStrategy} disabled={sending || complete} />
-        <Button
-          className="w-full"
-          onClick={onSend}
-          disabled={sending || complete || rank.candidates.length === 0}
-        >
-          {complete ? <Check /> : <Send />}
-          {complete ? "Shift filled" : sending ? "Sending offers…" : "Send offers"}
+        <p className="strategy-explain">{chosen?.explain}</p>
+        <Button className="w-full" onClick={onSend} disabled={!canSend}>
+          {filled ? <Check /> : <Send />}
+          {filled
+            ? "Shift filled"
+            : running
+              ? `Offers out · ${dispatch?.minute ?? 0} min`
+              : status === "unfilled"
+                ? "Everyone qualified was asked"
+                : rank.candidates.length === 0
+                  ? "No one qualifies"
+                  : "Send offers"}
         </Button>
-        <CardFooter>Strategy affects speed and fairness</CardFooter>
       </section>
-      <section className="panel">
-        <div className="panel-head">
-          <h2 className="panel-title">
-            <Clock />
-            Offer timeline
-          </h2>
-          <span className="text-muted-foreground text-[10px]">Today, Nov 18</span>
+      <section className="panel replies-panel">
+        <div className="replies-head">
+          <h3>Replies</h3>
+          {running && (
+            <span className="live-label">
+              <span className="live-dot" /> Live
+            </span>
+          )}
         </div>
         <div className="timeline" aria-live="polite">
           {events.length === 0 ? (
-            <div className="inner-tile empty-tile">
-              <Send size={22} />
-              <p>No offers sent yet</p>
-            </div>
+            <p className="replies-empty">Replies show up here as caregivers answer.</p>
           ) : (
-            events.map((e, i) => (
-              <div className="timeline-item" key={`${i}-${e.action}`}>
-                <span className="minute">min {e.minute}</span>
-                <InitialsAvatar name={e.caregiverName} small />
-                <p>{e.action === "sent" ? `Offer sent to ${e.caregiverName}` : e.caregiverName}</p>
-                {e.action !== "sent" && (
-                  <Badge tone={e.action === "accepted" ? "green" : "gray"}>
-                    {e.action === "no_response"
-                      ? "No response"
-                      : e.action === "accepted"
-                        ? "Accepted"
-                        : "Declined"}
-                  </Badge>
-                )}
-              </div>
-            ))
+            events.map((e, i) => <TimelineItem key={`${i}-${e.action}-${e.caregiverName}`} e={e} />)
           )}
-          {accepted && (
+          {filled && dispatch && (
             <div className="filled-tile" ref={(el) => el?.scrollIntoView({ behavior: "smooth", block: "nearest" })}>
               <span className="big-number">
-                {accepted.minute} <span className="text-2xl">min</span>
+                {dispatch.minute} <span className="text-2xl">min</span>
               </span>
               <p>
-                Filled by <strong>{accepted.caregiverName}</strong>
+                Filled by <strong>{dispatch.filledBy}</strong> · {offers} offer{offers === 1 ? "" : "s"}
               </p>
-              <div className="striped mt-4" />
+            </div>
+          )}
+          {status === "unfilled" && (
+            <div className="inner-tile unfilled-tile">
+              <strong>Nobody accepted</strong>
+              <p>Everyone qualified was asked. Escalate to the on-call supervisor or relax a requirement.</p>
             </div>
           )}
         </div>
-        <CardFooter>Every offer, one clear trail</CardFooter>
-      </section>
-      <section className="panel">
-        <div className="panel-head">
-          <h2 className="panel-title">
-            <CalendarCheckIcon />
-            Shift summary
-          </h2>
-          <Badge tone={complete ? "green" : shift.noticeHours < 12 ? "urgent" : "neutral"}>
-            {complete ? "Filled" : shift.noticeHours < 12 ? "Urgent" : "Open"}
-          </Badge>
-        </div>
-        {[
-          ["Qualified caregivers", rank.candidates.length],
-          ["Filtered out", rank.filteredOut.length],
-          ["Best score", rank.candidates[0]?.score.toFixed(2) ?? "—"],
-          ["Payer", shift.payer],
-        ].map(([label, value]) => (
-          <div className="summary-row" key={label}>
-            <span className="summary-toggle" />
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-        <CardFooter>
-          <Link to="/shifts">View all shifts</Link>
-        </CardFooter>
       </section>
     </aside>
   );
-}
-function CalendarCheckIcon() {
-  return <Check />;
 }

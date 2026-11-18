@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, MapPin, TrendingUp, AlertCircle } from "lucide-react";
+import { ArrowUpRight, MapPin, TrendingUp, AlertCircle, Sparkles, HeartHandshake, Clock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 export function InitialsAvatar({
@@ -90,9 +90,21 @@ export function ScoreBar({ value }: { value: number }) {
     </div>
   );
 }
+const WARNINGS = /^(Near overtime|Asked \d+×|Long drive)/;
+export const isWarningReason = (reason: string) => WARNINGS.test(reason);
 export function ReasonChip({ reason }: { reason: string }) {
-  const warning = reason === "Near overtime";
-  const Icon = warning ? AlertCircle : reason.startsWith("Lives") ? MapPin : TrendingUp;
+  const warning = WARNINGS.test(reason);
+  const Icon = warning
+    ? AlertCircle
+    : reason.startsWith("Lives")
+      ? MapPin
+      : reason.startsWith("New") || reason.startsWith("Little history")
+        ? Sparkles
+        : reason.startsWith("Knows")
+          ? HeartHandshake
+          : reason.startsWith("Usually") || reason.startsWith("Has hours")
+            ? Clock
+            : TrendingUp;
   return (
     <span className={`reason-chip ${warning ? "warning" : ""}`}>
       <Icon />
@@ -144,6 +156,10 @@ export function PageSkeleton() {
   );
 }
 export const shortDate = (value: string) =>
-  new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+export const dayAndTime = (value: string) =>
+  `${new Date(value).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} · ${time(value)}`;
+export const noticeLabel = (hours: number) =>
+  hours < 1 ? `${Math.max(1, Math.round(hours * 60))} min` : hours < 48 ? `${Math.round(hours * 10) / 10} h` : `${Math.round(hours / 24)} d`;
 export const time = (value: string) =>
-  new Date(value).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  new Date(value).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
