@@ -21,7 +21,8 @@ import { useEngineVersion } from "./engineStore";
 import { LogCancellationDialog } from "./LogCancellationDialog";
 import { TopStats } from "./TopStats";
 import { installElasticScroll } from "./elasticScroll";
-import { resetDemo } from "@/lib/api";
+import { getAgent, resetDemo, setAgentMode } from "@/lib/api";
+import { AgentDock } from "./AgentDock";
 import logoUrl from "@/assets/logo.webp";
 
 function LogoMark({ size = 20 }: { size?: number }) {
@@ -32,14 +33,14 @@ const tabs = [
   { to: "/caregivers", label: "Caregivers", icon: Users },
   { to: "/shifts", label: "Shifts", icon: CalendarCheck },
   { to: "/simulation", label: "Simulation", icon: FlaskConical },
+  { to: "/agent", label: "Agent report", icon: Sparkles },
   { to: "/how-it-works", label: "How it works", icon: BookOpen },
 ] as const;
 export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [menu, setMenu] = useState(false);
   const [logging, setLogging] = useState(false);
-  // Visual only for now; the agent gets wired up next.
-  const [agent, setAgent] = useState(false);
+  const agent = getAgent().on;
   const queryClient = useQueryClient();
   const version = useEngineVersion();
   // Any engine change (offer answered, shift filled, new cancellation) refreshes every screen.
@@ -99,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               role="switch"
               aria-checked={agent}
               className={`agent-switch ${agent ? "on" : ""}`}
-              onClick={() => setAgent((a) => !a)}
+              onClick={() => setAgentMode(!agent)}
             >
               <Sparkles />
               <span>Agent mode</span>
@@ -120,6 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         <main className="page-content" data-elastic>{children}</main>
       </div>
+      <AgentDock />
       <LogCancellationDialog open={logging} onOpenChange={setLogging} />
       <Sheet open={menu} onOpenChange={setMenu}>
         <SheetContent side="left">
