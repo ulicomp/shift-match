@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Radar,
   Users,
@@ -31,6 +31,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [menu, setMenu] = useState(false);
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing)) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const title = tabs.find((t) => t.to === path)?.label ?? "Page not found";
   const prototype = () => toast("This is a prototype. No notifications or settings are connected.");
   return (
@@ -53,10 +66,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Tooltip>
           ))}
         </nav>
+        <div className="rail-bottom">
         <IconButton label="Agency profile" onClick={() => toast("Miami Home Care · dispatch team")}>
           <Users />
         </IconButton>
         <InitialsAvatar name="Alex Morgan" />
+        </div>
       </aside>
       <div className="workspace">
         <div className="mobile-menu">
@@ -88,11 +103,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Search size={15} className="text-muted-foreground" />
             <input
+              ref={searchRef}
               aria-label="Search caregivers or clients"
               placeholder="Search caregivers or clients"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            <kbd className="search-kbd">⌘K</kbd>
             <Button
               variant="ghost"
               size="icon"
