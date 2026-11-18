@@ -1330,3 +1330,44 @@ html, body { height: 100%; overflow: hidden; }
 
 .widget-column { scrollbar-width: thin; padding-bottom: 4px; }
 .widget-column > .panel { flex-shrink: 0; }
+
+/* ===== Native controls matched to the design ===== */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
+  border-radius: 999px; border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent); }
+::-webkit-scrollbar-corner { background: transparent; }
+::selection { background: color-mix(in oklab, var(--primary) 18%, transparent); }
+
+.select-pill {
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  padding-right: 36px; min-height: 40px;
+  background-color: var(--card);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position: calc(100% - 19px) 50%, calc(100% - 14px) 50%;
+  background-size: 5px 5px; background-repeat: no-repeat;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.select-pill option { background: var(--card); color: var(--foreground); }
+.select-pill:hover, .number-pill:hover { border-color: color-mix(in oklab, var(--foreground) 25%, var(--input)); }
+.select-pill:focus-visible, .number-pill:focus-visible, .data-table th button:focus-visible, .filtered summary:focus-visible {
+  outline: 2px solid var(--ring); outline-offset: 2px;
+}
+.number-pill { appearance: textfield; -moz-appearance: textfield; min-height: 40px; }
+.number-pill::-webkit-inner-spin-button, .number-pill::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.filtered summary { list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 12px; }
+.filtered summary::-webkit-details-marker { display: none; }
+.filtered summary::before {
+  content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); transition: transform 150ms; margin-left: 2px;
+}
+.filtered[open] summary::before { transform: rotate(45deg); }
+.filtered summary:hover { color: var(--foreground); }
+.search-pill input::placeholder { color: var(--muted-foreground); }
+.search-pill input::-webkit-search-cancel-button { display: none; }
