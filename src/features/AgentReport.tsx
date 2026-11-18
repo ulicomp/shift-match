@@ -4,6 +4,7 @@ import { getAgent, setAgentMode } from "@/lib/api";
 import { Badge, InitialsAvatar, StatTile, time } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { selectShift, useEngineVersion } from "@/components/engineStore";
+import { AgentOrb } from "@/components/AgentOrb";
 
 const clock = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "—";
@@ -16,9 +17,7 @@ export default function AgentReport() {
   if (!run)
     return (
       <section className="panel agent-empty">
-        <span className="agent-orb large">
-          <Sparkles />
-        </span>
+        <AgentOrb size={72} />
         <h2>No agent runs yet</h2>
         <p>
           Turn on Agent mode and it works through every cancelled visit for you: it ranks who can cover each
@@ -43,9 +42,7 @@ export default function AgentReport() {
     <div className="report">
       <section className="panel report-hero">
         <div className="report-title">
-          <span className="agent-orb">
-            <Sparkles />
-          </span>
+          <AgentOrb size={44} active={run.status !== "done"} />
           <div>
             <h2>{run.status === "done" ? "Agent report" : "Agent is working…"}</h2>
             <p>

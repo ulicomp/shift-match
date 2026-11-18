@@ -23,6 +23,7 @@ import { TopStats } from "./TopStats";
 import { installElasticScroll } from "./elasticScroll";
 import { getAgent, resetDemo, setAgentMode } from "@/lib/api";
 import { AgentDock } from "./AgentDock";
+import { AgentOrb } from "./AgentOrb";
 import logoUrl from "@/assets/logo.webp";
 
 function LogoMark({ size = 20 }: { size?: number }) {
@@ -40,7 +41,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [menu, setMenu] = useState(false);
   const [logging, setLogging] = useState(false);
-  const agent = getAgent().on;
+  const agentState = getAgent();
+  const agent = agentState.on;
+  const agentRunning = agentState.run?.status === "running" || agentState.run?.status === "stopping";
   const queryClient = useQueryClient();
   const version = useEngineVersion();
   // Any engine change (offer answered, shift filled, new cancellation) refreshes every screen.
@@ -102,7 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               className={`agent-switch ${agent ? "on" : ""}`}
               onClick={() => setAgentMode(!agent)}
             >
-              <Sparkles />
+              <AgentOrb size={22} active={agentRunning} />
               <span>Agent mode</span>
               <span className="agent-track" aria-hidden="true">
                 <span className="agent-knob" />

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { ArrowRight, Sparkles, Square, X } from "lucide-react";
+import { ArrowRight, Square, X } from "lucide-react";
 import { getAgent, setAgentMode } from "@/lib/api";
 import type { AgentLogEntry } from "@/lib/types";
 import { useEngineVersion } from "./engineStore";
+import { AgentOrb } from "./AgentOrb";
 
 const KIND_TONE: Partial<Record<AgentLogEntry["kind"], string>> = {
   accepted: "good",
@@ -45,9 +46,7 @@ export function AgentDock() {
   return (
     <aside className={`agent-dock ${done ? "done" : ""}`} aria-live="polite" aria-label="Agent activity">
       <div className="agent-dock-head">
-        <span className="agent-orb">
-          <Sparkles />
-        </span>
+        <AgentOrb size={38} active={!done} />
         <div className="flex-1 min-w-0">
           <strong>{done ? "Agent finished" : run.status === "stopping" ? "Agent finishing up" : "Agent is working"}</strong>
           <p>
