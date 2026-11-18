@@ -17,6 +17,8 @@ import {
   setAgentMode,
 } from "@/lib/api";
 import { slotsCovered } from "@/lib/engine/time";
+import { createWorld, offersLast7Days } from "@/lib/engine/world";
+import { fairnessReason, rankShift } from "@/lib/engine/ranking";
 import { toLocalIso } from "@/lib/engine/time";
 
 const NOW = new Date(2026, 10, 18, 9, 0).getTime(); // Wed Nov 18 2026, 9:00 local
@@ -75,6 +77,40 @@ describe("ranking", () => {
         if (next) expect(c.rankScore).toBeGreaterThanOrEqual(next.rankScore);
       });
     }
+  });
+
+  it("explains when the fairness penalty puts a lower % above a higher one", () => {
+    const w = createWorld(NOW);
+    let reorders = 0;
+    for (const shift of w.openShifts) {
+      // Ask the person with the higher % a lot this week until fairness drops them a spot.
+      const byLikelihood = [...rankShift(w, shift).candidates].sort((a, b) => b.score - a.score);
+      for (let i = 0; i + 1 < byLikelihood.length; i++) {
+        const higher = byLikelihood[i];
+        const cg = w.caregivers.find((c) => c.seed.id === higher?.caregiverId);
+        if (!higher || !cg) continue;
+        const saved = [...cg.offerTimes];
+        for (let k = 0; k < 12; k++) {
+          cg.offerTimes.push(NOW - 60_000 * (k + 1));
+          const { candidates } = rankShift(w, shift);
+          // Whenever the order disagrees with the %, the one pushed down says why.
+          candidates.forEach((c, idx) => {
+            const lowerAbove = candidates.slice(0, idx).some((o) => o.score < c.score);
+            if (!lowerAbove) return;
+            reorders++;
+            const person = w.caregivers.find((x) => x.seed.id === c.caregiverId);
+            expect(person).toBeDefined();
+            expect(c.fairnessMoved).toBe(true);
+            expect(c.fairnessPenalty).toBeGreaterThan(0);
+            if (person) expect(c.reasons).toContain(fairnessReason(offersLast7Days(person, NOW)));
+          });
+          // Anyone not pushed down gets no fairness chip.
+          for (const c of candidates) if (!c.fairnessMoved) expect(c.reasons.some((r) => r.endsWith("· fairness"))).toBe(false);
+        }
+        cg.offerTimes = saved;
+      }
+    }
+    expect(reorders).toBeGreaterThan(0);
   });
 
   it("learned sensible directions from past answers", async () => {

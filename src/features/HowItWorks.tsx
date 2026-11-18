@@ -26,7 +26,7 @@ const steps = [
     number: "04",
     icon: GitBranch,
     title: "Live re-ranking and fairness",
-    text: "Offers go out one at a time or three at once. A decline comes back with a reason: “too far” makes distance count more for this visit, “time doesn't work” boosts time-of-day fit, and the list re-ranks before the next text. People asked more than the team's median this week get a small penalty so nobody burns out.",
+    text: "Offers go out one at a time or three at once. A decline comes back with a reason: “too far” makes distance count more for this visit, “time doesn't work” boosts time-of-day fit, and the list re-ranks before the next text. People asked more than the team's median this week get a small penalty so nobody burns out. That's why someone with a slightly higher % can rank below someone who's been asked less.",
   },
 ];
 

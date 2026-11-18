@@ -49,9 +49,11 @@ export type CandidateStatus = "ready" | "offered" | "declined" | "no_response" |
 export interface Candidate {
   caregiverId: string;
   name: string;
-  score: number; // model's predicted probability of accepting (0–1)
+  score: number; // model's predicted probability of accepting (0–1) — the % shown
   rankScore: number; // score minus fairness penalty — what the list is sorted by
   fairnessPenalty: number;
+  /** True when the fairness penalty moved this person below someone with a lower %. */
+  fairnessMoved: boolean;
   rank: number; // 0 when no longer in line (declined / no response)
   distanceMiles: number;
   hoursThisWeek: number;

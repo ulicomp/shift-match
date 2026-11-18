@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Check, RotateCcw, Send, Users, UserX } from "lucide-react";
 import type { Candidate, DispatchState, OfferEvent, RankResult, Shift, Strategy } from "@/lib/types";
 import { Button } from "./ui/button";
-import { Badge, InitialsAvatar, ReasonChip, ScoreBar, isWarningReason, noticeLabel, time } from "./shared";
+import { Badge, InitialsAvatar, ReasonChip, ScoreBar, isWarningReason, isFairnessReason, noticeLabel, time } from "./shared";
 
 const dayLabel = (iso: string) => {
   const d = new Date(iso);
@@ -106,6 +106,9 @@ const STATUS_BADGE: Record<Candidate["status"], { label: string; tone: "gray" | 
 
 /** Two chips at most: the best reason, plus a warning if there is one. */
 function pickReasons(reasons: string[]) {
+  // The fairness chip explains why a lower % sits above this person, so it always shows.
+  const fairness = reasons.find(isFairnessReason);
+  if (fairness) return [reasons.find((r) => r !== fairness && !isWarningReason(r)) ?? null, fairness].filter((r): r is string => !!r);
   const flags = reasons.filter((r) => isWarningReason(r) || r.startsWith("New") || r.startsWith("Little history"));
   const good = reasons.filter((r) => !flags.includes(r));
   return [...good.slice(0, flags.length ? 1 : 2), ...flags.slice(0, 1)];

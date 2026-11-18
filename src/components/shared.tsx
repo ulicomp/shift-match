@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, MapPin, TrendingUp, AlertCircle, Sparkles, HeartHandshake, Clock } from "lucide-react";
+import { ArrowUpRight, ArrowDown, MapPin, TrendingUp, AlertCircle, Sparkles, HeartHandshake, Clock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 export function InitialsAvatar({
@@ -92,9 +92,12 @@ export function ScoreBar({ value }: { value: number }) {
 }
 const WARNINGS = /^(Near overtime|Asked \d+×|Long drive)/;
 export const isWarningReason = (reason: string) => WARNINGS.test(reason);
+export const isFairnessReason = (reason: string) => reason.endsWith("· fairness");
 export function ReasonChip({ reason }: { reason: string }) {
   const warning = WARNINGS.test(reason);
-  const Icon = warning
+  const Icon = isFairnessReason(reason)
+    ? ArrowDown
+    : warning
     ? AlertCircle
     : reason.startsWith("Lives")
       ? MapPin
@@ -108,7 +111,8 @@ export function ReasonChip({ reason }: { reason: string }) {
   return (
     <span className={`reason-chip ${warning ? "warning" : ""}`}>
       <Icon />
-      {reason}
+      {/* the fairness chip's ↓ is drawn as the icon */}
+      {isFairnessReason(reason) ? reason.replace(/^↓\s*/, "") : reason}
     </span>
   );
 }

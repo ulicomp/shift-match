@@ -11,6 +11,9 @@ export type WeightScale = number[];
 
 export const FAIRNESS = { perExtraOffer: 0.015, cap: 0.08 };
 
+/** Reason chip for someone the fairness penalty moved down the list. */
+export const fairnessReason = (offersThisWeek: number) => `↓ Asked ${offersThisWeek}× this week · fairness`;
+
 export function fairnessPenalty(offers: number, teamMedian: number) {
   return Math.min(FAIRNESS.cap, FAIRNESS.perExtraOffer * Math.max(0, offers - teamMedian));
 }
@@ -75,6 +78,7 @@ export function rankShift(w: World, shift: Shift, opts: RankOptions = {}): RankR
   const avg = FEATURES.map((_, i) => contribs.reduce((s, c) => s + (c[i] ?? 0), 0) / Math.max(1, contribs.length));
   const slot = new Date(shift.start).getHours() < 12 ? "morning" : new Date(shift.start).getHours() < 17 ? "afternoon" : "evening";
 
+  const offersById = new Map(pool.map((p) => [p.cg.seed.id, p.input.offersLast7Days]));
   const candidates: Candidate[] = pool.map((p, idx) => {
     const score = opts.frozenScores?.get(p.cg.seed.id) ?? predict(w.model, p.x, opts.weightScale);
     const penalty = fairnessPenalty(p.input.offersLast7Days, teamMedian);
@@ -92,6 +96,7 @@ export function rankShift(w: World, shift: Shift, opts: RankOptions = {}): RankR
       score: Math.round(score * 100) / 100,
       rankScore: score - penalty,
       fairnessPenalty: Math.round(penalty * 100) / 100,
+      fairnessMoved: false,
       rank: 0,
       distanceMiles: p.input.miles,
       hoursThisWeek: p.cg.hoursThisWeek,
@@ -105,6 +110,18 @@ export function rankShift(w: World, shift: Shift, opts: RankOptions = {}): RankR
 
   const order: Record<CandidateStatus, number> = { accepted: 0, offered: 1, ready: 2, declined: 3, no_response: 3, withdrawn: 3 };
   candidates.sort((a, b) => order[a.status] - order[b.status] || b.rankScore - a.rankScore || a.distanceMiles - b.distanceMiles);
+
+  // Flag people the fairness penalty moved down: compare the final order of those still
+  // waiting for a text with the order they'd have by raw likelihood alone.
+  const ready = candidates.filter((c) => c.status === "ready");
+  const byLikelihood = [...ready].sort((a, b) => b.score - a.score || a.distanceMiles - b.distanceMiles);
+  ready.forEach((c, finalIndex) => {
+    if (c.fairnessPenalty <= 0 || finalIndex <= byLikelihood.indexOf(c)) return;
+    c.fairnessMoved = true;
+    const offers = offersById.get(c.caregiverId) ?? 0;
+    // The fairness chip replaces the plain "Asked N×" warning and always comes first.
+    c.reasons = [fairnessReason(offers), ...c.reasons.filter((r) => !r.startsWith("Asked "))].slice(0, 3);
+  });
   let n = 0;
   for (const c of candidates) c.rank = order[c.status] <= 2 ? ++n : 0;
   filteredOut.sort((a, b) => a.reason.localeCompare(b.reason) || a.name.localeCompare(b.name));

@@ -92,7 +92,6 @@ export default function Dispatch() {
     );
 
   const running = dispatch?.status === "running";
-  const inLine = rank.candidates.filter((c) => c.rank > 0).length;
 
   return (
     <div className="dispatch-grid">
@@ -127,7 +126,7 @@ export default function Dispatch() {
               </span>
             ) : undefined
           }
-          hint={`${inLine} can take it · % is the chance they say yes`}
+          hint="% is the chance they say yes · order also spreads work fairly"
         />
         <RankedCandidates shift={shift} rank={rank} />
       </section>
