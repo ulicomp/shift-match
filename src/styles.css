@@ -3043,8 +3043,11 @@ html, body { height: 100%; overflow: hidden; }
 
 /* ===================== Agent dock: liquid glass ===================== */
 .agent-dock {
-  background: linear-gradient(160deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.48));
-  backdrop-filter: blur(26px) saturate(190%) brightness(1.04);
+  /* Frosted enough that the page behind reads as soft color, never as text */
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(227 237 255 / 0.55), transparent 60%),
+    linear-gradient(160deg, rgb(255 255 255 / 0.9), rgb(248 249 252 / 0.82));
+  backdrop-filter: blur(44px) saturate(170%);
   border: 1px solid rgb(255 255 255 / 0.85);
   box-shadow:
     0 0 0 1px rgb(23 25 29 / 0.07),
@@ -3208,4 +3211,25 @@ html, body { height: 100%; overflow: hidden; }
 }
 .buddy.active::before {
   opacity: 0.62;
+}
+
+/* No backdrop blur (some browsers, battery saver, GPU off): stay solid, never see-through */
+@supports not (backdrop-filter: blur(1px)) {
+  .agent-dock {
+    background: linear-gradient(160deg, #fff, #f6f8fb);
+  }
+}
+
+/* ===================== Simulation: values inside the bars ===================== */
+.bar-value {
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+}
+.bar-value .bar-unit {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.75;
 }
