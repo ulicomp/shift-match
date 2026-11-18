@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, LoaderCircle, ChartNoAxesColumn } from "lucide-react";
+import { Play, LoaderCircle, ChartNoAxesColumn, Minus, Plus } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -32,32 +32,41 @@ export default function Simulation() {
   };
   const fairness = results[strategy]?.offersPerCaregiver ?? [];
   const average = fairness.reduce((n, c) => n + c.offers, 0) / Math.max(1, fairness.length);
-  const colors = ["var(--primary)", "var(--coral)", "var(--chart-gray)"];
+  const colors = ["var(--brand)", "var(--primary)", "var(--chart-gray)"];
   return (
     <>
       <section className="panel">
         <h2>Strategy simulation</h2>
         <p className="text-muted-foreground text-xs mt-2 mb-6">
-          Compare coverage speed and how offers are shared across the team.
+          Replays the same random cancellations against the same simulated caregivers under each
+          strategy. A shift counts as filled only if someone says yes within half the notice time
+          (max 2 hours).
         </p>
         <div className="sim-controls">
           <label>
             Shifts to simulate
-            <input
-              type="number"
-              className="number-pill"
-              aria-label="Shifts to simulate"
-              min={1}
-              max={10000}
-              value={count}
-              onChange={(e) => setCount(Number(e.target.value))}
-            />
+            <span className="stepper">
+              <button type="button" aria-label="100 fewer shifts" onClick={() => setCount((c) => Math.max(100, c - 100))}>
+                <Minus />
+              </button>
+              <input
+                type="number"
+                aria-label="Shifts to simulate"
+                min={1}
+                max={10000}
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+              />
+              <button type="button" aria-label="100 more shifts" onClick={() => setCount((c) => Math.min(10000, c + 100))}>
+                <Plus />
+              </button>
+            </span>
           </label>
           <Button disabled={busy} onClick={run}>
             {busy ? <LoaderCircle className="animate-spin" /> : <Play />}
             {busy ? "Running simulation…" : "Run simulation"}
           </Button>
-          <span className="text-muted-foreground text-xs">November 2026 · local sample</span>
+          <span className="text-muted-foreground text-xs">Runs in your browser · same seed every time</span>
         </div>
       </section>
       <div className="simulation-results">
@@ -142,11 +151,11 @@ export default function Simulation() {
               </div>
               <div className="chart-legend">
                 <span>
-                  <i className="bg-primary" />
+                  <i className="bg-brand" />
                   One at a time
                 </span>
                 <span>
-                  <i className="bg-coral" />
+                  <i className="bg-primary" />
                   Top 3
                 </span>
                 <span>

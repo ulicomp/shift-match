@@ -1,18 +1,17 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ChevronDown, Check } from "lucide-react";
-import { getCaregivers, getShifts, getPastShifts } from "@/lib/api";
+import { ChevronDown, Check, Search } from "lucide-react";
+import { getCaregivers, getClients } from "@/lib/api";
 import type { Caregiver } from "@/lib/types";
 import { InitialsAvatar, Badge, ScoreBar, StatBubble } from "@/components/shared";
-import { useGlobalSearch } from "@/components/searchStore";
 import { Button } from "@/components/ui/button";
+import { Dropdown } from "@/components/Dropdown";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 export const caregiversQuery = { queryKey: ["caregivers"], queryFn: getCaregivers };
 export default function Caregivers() {
   const { data } = useSuspenseQuery(caregiversQuery);
-  const { data: shifts } = useSuspenseQuery({ queryKey: ["open-shifts"], queryFn: getShifts });
-  const { data: past } = useSuspenseQuery({ queryKey: ["past-shifts"], queryFn: getPastShifts });
-  const search = useGlobalSearch();
+  const { data: clients } = useSuspenseQuery({ queryKey: ["clients"], queryFn: getClients });
+  const [search, setSearch] = useState("");
   const [skill, setSkill] = useState("");
   const [payer, setPayer] = useState("");
   const [sort, setSort] = useState("name");
@@ -50,27 +49,37 @@ export default function Caregivers() {
           Caregiver directory{" "}
           <span className="text-muted-foreground text-xs ml-2">{rows.length} caregivers</span>
         </h2>
-        <select
-          className="select-pill"
-          aria-label="Skill filter"
+        <label className="table-search">
+          <Search size={14} />
+          <input
+            aria-label="Search caregivers"
+            placeholder="Search by name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
+        <Dropdown
+          label="Skill filter"
+          prefix="Skill:"
           value={skill}
-          onChange={(e) => setSkill(e.target.value)}
-        >
-          <option value="">Skill: All</option>
-          {[...new Set(data.flatMap((c) => c.skills))].map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
-        <select
-          className="select-pill"
-          aria-label="Payer filter"
+          onChange={setSkill}
+          options={[
+            { value: "", label: "All" },
+            ...[...new Set(data.flatMap((c) => c.skills))].sort().map((s) => ({ value: s, label: s })),
+          ]}
+        />
+        <Dropdown
+          label="Payer filter"
+          prefix="Payer:"
           value={payer}
-          onChange={(e) => setPayer(e.target.value)}
-        >
-          <option value="">Payer: All</option>
-          <option>VA</option>
-          <option>Medicaid</option>
-        </select>
+          onChange={setPayer}
+          menuWidth={180}
+          options={[
+            { value: "", label: "All" },
+            { value: "VA", label: "VA" },
+            { value: "Medicaid", label: "Medicaid" },
+          ]}
+        />
       </div>
       <table className="data-table">
         <thead>
@@ -137,7 +146,7 @@ export default function Caregivers() {
                 {c.hoursThisWeek} / {c.maxWeeklyHours}
                 <ScoreBar value={c.hoursThisWeek / c.maxWeeklyHours} />
               </td>
-              <td>{Math.round(c.acceptanceRate * 100)}%</td>
+              <td>{c.offersTotal ? `${Math.round(c.acceptanceRate * 100)}%` : <Badge>New</Badge>}</td>
               <td>{c.offersLast7Days}</td>
             </tr>
           ))}
@@ -156,11 +165,13 @@ export default function Caregivers() {
               <div className="sheet-hero">
                 <InitialsAvatar name={person.name} large />
                 <SheetTitle className="mt-3">{person.name}</SheetTitle>
-                <SheetDescription>Caregiver · Miami Home Care</SheetDescription>
+                <SheetDescription>
+                  Caregiver · lives in {person.neighborhood} · {person.homeMiles} mi from the office
+                </SheetDescription>
               </div>
               <div className="sheet-stats">
                 <StatBubble
-                  value={`${Math.round(person.acceptanceRate * 100)}%`}
+                  value={person.offersTotal ? `${Math.round(person.acceptanceRate * 100)}%` : "New"}
                   label="acceptance"
                 />
                 <StatBubble value={person.hoursThisWeek} label="hours" />
@@ -182,44 +193,38 @@ export default function Caregivers() {
                 <h3>Clients served</h3>
                 <div className="space-y-3">
                   {person.clientIds.map((id) => {
-                    const name =
-                      shifts.find((s) => s.clientId === id)?.clientName ??
-                      [...new Set(past.map((s) => s.clientName))][
-                        Number(id.replace("client-", ""))
-                      ];
-                    return name ? (
+                    const client = clients.find((c) => c.id === id);
+                    return client ? (
                       <div className="flex gap-3 items-center text-xs" key={id}>
-                        <InitialsAvatar name={name} />
-                        {name}
+                        <InitialsAvatar name={client.name} />
+                        {client.name}
+                        <span className="text-muted-foreground">· {client.neighborhood}</span>
                       </div>
-                    ) : (
-                      <div className="flex gap-3 items-center text-xs" key={id}>
-                        <InitialsAvatar name="Past client" />
-                        Past client
-                      </div>
-                    );
+                    ) : null;
                   })}
+                  {person.clientIds.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No clients yet.</p>
+                  )}
                 </div>
               </div>
               <div className="sheet-section">
                 <h3>
                   Offer history{" "}
-                  <span className="text-muted-foreground font-normal text-xs">· sample week</span>
+                  <span className="text-muted-foreground font-normal text-xs">· last 6 weeks</span>
                 </h3>
                 <div className="inner-tile">
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <p className="big-number">
-                        {Math.round(person.offersLast7Days * person.acceptanceRate)}
+                        {person.acceptedTotal}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">Accepted</p>
                     </div>
                     <div>
                       <p className="big-number">
-                        {person.offersLast7Days -
-                          Math.round(person.offersLast7Days * person.acceptanceRate)}
+                        {person.offersTotal - person.acceptedTotal}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-2">Declined</p>
+                      <p className="text-xs text-muted-foreground mt-2">Declined or no reply</p>
                     </div>
                   </div>
                   <div className="striped" />

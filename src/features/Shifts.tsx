@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { getPastShifts } from "@/lib/api";
 import { InitialsAvatar, Badge, StatTile, shortDate } from "@/components/shared";
+import { Dropdown } from "@/components/Dropdown";
 export const pastShiftsQuery = { queryKey: ["past-shifts"], queryFn: getPastShifts };
 export default function Shifts() {
   const { data } = useSuspenseQuery(pastShiftsQuery);
@@ -16,26 +17,29 @@ export default function Shifts() {
     <section className="panel table-panel">
       <div className="table-toolbar">
         <h2 className="mr-auto">Filled shifts</h2>
-        <select
-          aria-label="Filled shifts payer"
-          className="select-pill"
+        <Dropdown
+          label="Filled shifts payer"
+          prefix="Payer:"
           value={payer}
-          onChange={(e) => setPayer(e.target.value)}
-        >
-          <option value="">Payer: All</option>
-          <option>VA</option>
-          <option>Medicaid</option>
-        </select>
-        <select
-          aria-label="Filled shifts strategy"
-          className="select-pill"
+          onChange={setPayer}
+          menuWidth={180}
+          options={[
+            { value: "", label: "All" },
+            { value: "VA", label: "VA" },
+            { value: "Medicaid", label: "Medicaid" },
+          ]}
+        />
+        <Dropdown
+          label="Filled shifts strategy"
+          prefix="Strategy:"
           value={strategy}
-          onChange={(e) => setStrategy(e.target.value)}
-        >
-          <option value="">Strategy: All</option>
-          <option value="sequential">One at a time</option>
-          <option value="top3">Top 3 at once</option>
-        </select>
+          onChange={setStrategy}
+          options={[
+            { value: "", label: "All" },
+            { value: "sequential", label: "One at a time" },
+            { value: "top3", label: "Top 3 at once" },
+          ]}
+        />
       </div>
       <div className="stats-grid">
         <StatTile value={avg("minutesToFill")} label="Avg minutes to fill" />
@@ -60,7 +64,7 @@ export default function Shifts() {
         <tbody>
           {rows.map((s) => (
             <tr key={s.id}>
-              <td>{shortDate(s.date)}, 2026</td>
+              <td>{shortDate(s.date)}</td>
               <td>
                 <div className="person">
                   <InitialsAvatar name={s.clientName} />

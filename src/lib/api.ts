@@ -1,175 +1,226 @@
-import { caregivers, shifts, pastShifts } from "./mock";
+/**
+ * The only module the UI talks to. Today it runs the matching engine in the browser
+ * against an in-memory agency; swapping in a real backend means re-implementing
+ * these functions with fetch calls and keeping the same signatures.
+ */
 import type {
-  Shift,
   Caregiver,
+  Client,
+  DispatchState,
+  ModelInfo,
+  NewCancellation,
+  OfferEvent,
   PastShift,
   RankResult,
-  OfferEvent,
+  Shift,
   SimulationResult,
-} from "./types";
-const delay = (ms = 240) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-const filled: PastShift[] = [];
+  Strategy,
+} from "./types.ts";
+import { createDispatch, runToEnd, stepDispatch, type LiveDispatch } from "./engine/dispatch.ts";
+import { FEATURES } from "./engine/features.ts";
+import { rankShift } from "./engine/ranking.ts";
+import { simulate } from "./engine/simulation.ts";
+import { HOUR } from "./engine/time.ts";
+import { createWorld, findCaregiver, findClient, makeShift, officeMiles, offersLast7Days, type World } from "./engine/world.ts";
+
+const config: { latencyMs: number; minuteMs: number; clock: () => number } = {
+  latencyMs: 180,
+  minuteMs: 900,
+  clock: () => Date.now(),
+};
+
+/** Tests set the delays to 0 and pin the clock so results don't depend on the time of day. */
+export function configureEngine(next: Partial<typeof config>) {
+  Object.assign(config, next);
+}
+
+let world: World | null = null;
+const dispatches = new Map<string, LiveDispatch>();
+const listeners = new Set<() => void>();
+let version = 0;
+
+const getWorld = () => (world ??= createWorld(config.clock()));
+const notify = () => {
+  version++;
+  listeners.forEach((l) => l());
+};
+const delay = (ms = config.latencyMs) =>
+  ms ? new Promise<void>((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+
+/** Start over with a fresh agency (new "now", same people). */
+export function resetDemo(now?: number) {
+  dispatches.clear();
+  world = createWorld(now ?? config.clock());
+  notify();
+}
+
+/** Subscribe to any engine change (offers moving, shifts filled, new cancellations). */
+export function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+export const getVersion = () => version;
+
 export async function getShifts(): Promise<Shift[]> {
   await delay();
-  return shifts.filter((s) => !filled.some((p) => p.id === s.id)).map((s) => ({ ...s }));
+  return getWorld().openShifts
+    .map((s) => ({ ...s }))
+    .sort((a, b) => a.noticeHours - b.noticeHours);
 }
+
 export async function getPastShifts(): Promise<PastShift[]> {
   await delay();
-  return [...filled, ...pastShifts].sort((a, b) => b.date.localeCompare(a.date));
+  return getWorld().pastShifts.map((s) => ({ ...s }));
 }
+
+export async function getClients(): Promise<Client[]> {
+  await delay(0);
+  return getWorld().clients.map(({ id, name, neighborhood, payer, careNeeds }) => ({ id, name, neighborhood, payer, careNeeds: [...careNeeds] }));
+}
+
 export async function getCaregivers(): Promise<Caregiver[]> {
   await delay();
-  return caregivers.map((c) => ({ ...c }));
+  const w = getWorld();
+  return w.caregivers.map((c) => ({
+    id: c.seed.id,
+    name: c.seed.name,
+    neighborhood: c.seed.neighborhood,
+    skills: [...c.seed.skills],
+    credentials: [...c.seed.credentials],
+    homeMiles: officeMiles(c.seed),
+    hoursThisWeek: c.hoursThisWeek,
+    maxWeeklyHours: c.seed.maxWeeklyHours,
+    acceptanceRate: c.stats.offers ? Math.round((c.stats.accepted / c.stats.offers) * 100) / 100 : 0,
+    offersLast7Days: offersLast7Days(c, w.now),
+    offersTotal: c.stats.offers,
+    acceptedTotal: c.stats.accepted,
+    isNew: c.seed.tenureWeeks < 3,
+    clientIds: [...c.clientIds],
+    availability: c.seed.availability.map((a) => ({ ...a })),
+  }));
 }
-function rank(shiftId: string): RankResult {
-  const shift = shifts.find((s) => s.id === shiftId);
+
+function shiftById(shiftId: string): Shift {
+  const w = getWorld();
+  const shift = w.openShifts.find((s) => s.id === shiftId) ?? dispatches.get(shiftId)?.shift;
   if (!shift) throw new Error("Shift not found");
-  const result: RankResult = { shiftId, candidates: [], filteredOut: [] };
-  const start = new Date(shift.start);
-  const day = (start.getDay() + 6) % 7;
-  const slot = start.getHours() < 12 ? "morning" : start.getHours() < 17 ? "afternoon" : "evening";
-  for (const c of caregivers) {
-    const missing = shift.requiredSkills.find((s) => !c.skills.includes(s));
-    const reason = !c.availability.some((a) => a.day === day && a.slot === slot)
-      ? "Not available"
-      : missing
-        ? `Missing skill: ${missing}`
-        : !c.credentials.includes(shift.payer)
-          ? `Missing credential: ${shift.payer}`
-          : null;
-    if (reason) {
-      result.filteredOut.push({ caregiverId: c.id, name: c.name, reason });
-      continue;
-    }
-    const served = c.clientIds.includes(shift.clientId);
-    const score = Math.max(
-      0.1,
-      Math.min(
-        0.97,
-        0.62 +
-          c.acceptanceRate * 0.25 +
-          (served ? 0.11 : 0) -
-          c.homeMiles * 0.012 -
-          c.offersLast7Days * 0.008 -
-          (c.hoursThisWeek >= 36 ? 0.04 : 0),
-      ),
-    );
-    result.candidates.push({
-      caregiverId: c.id,
-      name: c.name,
-      score: +score.toFixed(2),
-      rank: 0,
-      distanceMiles: c.homeMiles,
-      hoursThisWeek: c.hoursThisWeek,
-      maxWeeklyHours: c.maxWeeklyHours,
-      servedClientBefore: served,
-      reasons: [
-        `Lives ${c.homeMiles} mi away`,
-        `Accepts ${Math.round(c.acceptanceRate * 100)}% of offers`,
-        ...(c.hoursThisWeek >= 36 ? ["Near overtime"] : []),
-      ],
-    });
-  }
-  result.candidates
-    .sort((a, b) => b.score - a.score || a.distanceMiles - b.distanceMiles)
-    .forEach((c, i) => (c.rank = i + 1));
-  return result;
+  return shift;
 }
+
 export async function rankCandidates(shiftId: string): Promise<RankResult> {
-  await delay(320);
-  return rank(shiftId);
+  await delay();
+  const d = dispatches.get(shiftId);
+  return rankShift(getWorld(), shiftById(shiftId), d ? { weightScale: d.weightScale, statuses: d.statuses, frozenScores: d.frozenScores } : {});
 }
-export async function sendOffers(
-  shiftId: string,
-  strategy: "sequential" | "top3",
-): Promise<OfferEvent[]> {
-  await delay(350);
-  if (filled.some((s) => s.id === shiftId)) throw new Error("This shift is already filled");
-  const candidates = rank(shiftId).candidates;
-  const first = candidates[0];
-  if (!first) return [];
-  const second = candidates[1] ?? first;
-  const events: OfferEvent[] =
-    strategy === "top3"
-      ? candidates.slice(0, 3).map((c) => ({ minute: 0, caregiverName: c.name, action: "sent" }))
-      : [
-          { minute: 0, caregiverName: first.name, action: "sent" },
-          { minute: 3, caregiverName: first.name, action: "declined" },
-          { minute: 3, caregiverName: second.name, action: "sent" },
-        ];
-  events.push({
-    minute: strategy === "top3" ? 4 : 12,
-    caregiverName: second.name,
-    action: "accepted",
+
+/** Same as rankCandidates but synchronous, for live re-rendering while offers are out. */
+export function rankNow(shiftId: string): RankResult | null {
+  try {
+    const d = dispatches.get(shiftId);
+    return rankShift(getWorld(), shiftById(shiftId), d ? { weightScale: d.weightScale, statuses: d.statuses, frozenScores: d.frozenScores } : {});
+  } catch {
+    return null;
+  }
+}
+
+export function getDispatch(shiftId: string): DispatchState | null {
+  const d = dispatches.get(shiftId);
+  return d ? { ...d.state, events: [...d.state.events] } : null;
+}
+
+/**
+ * Starts sending offers and resolves with the full timeline once the shift is filled
+ * (or nobody is left). Progress is published through subscribe() every simulated minute.
+ */
+export async function sendOffers(shiftId: string, strategy: Strategy): Promise<OfferEvent[]> {
+  await delay();
+  const w = getWorld();
+  const existing = dispatches.get(shiftId);
+  if (existing?.state.status === "filled") throw new Error("This shift is already filled");
+  if (existing?.state.status === "running") throw new Error("Offers are already out for this shift");
+  const d = createDispatch(shiftById(shiftId), strategy);
+  dispatches.set(shiftId, d);
+  if (!config.minuteMs) {
+    runToEnd(w, d);
+    notify();
+    return [...d.state.events];
+  }
+  return new Promise((resolve) => {
+    const tick = () => {
+      const events = stepDispatch(w, d);
+      if (events.length) notify();
+      if (d.state.status === "running") setTimeout(tick, events.length ? config.minuteMs : config.minuteMs / 3);
+      else {
+        notify();
+        resolve([...d.state.events]);
+      }
+    };
+    tick();
   });
-  const shift = shifts.find((s) => s.id === shiftId);
-  if (shift)
-    filled.push({
-      id: shiftId,
-      date: shift.start,
-      clientName: shift.clientName,
-      payer: shift.payer,
-      filledBy: second.name,
-      offers: events.filter((e) => e.action === "sent").length,
-      minutesToFill: strategy === "top3" ? 4 : 12,
-      strategy,
-    });
-  return events;
 }
+
+export async function logCancellation(input: NewCancellation): Promise<Shift> {
+  await delay();
+  const w = getWorld();
+  const client = findClient(w, input.clientId);
+  if (!client) throw new Error("Choose a client");
+  const start = new Date(input.start);
+  if (Number.isNaN(start.getTime())) throw new Error("Choose a start date and time");
+  w.now = Math.max(w.now, config.clock());
+  if (start.getTime() <= w.now) throw new Error("The visit must start in the future");
+  if (!(input.durationHours >= 1 && input.durationHours <= 12)) throw new Error("Visits are 1 to 12 hours");
+  if (!input.requiredSkills.length) throw new Error("Pick at least one required skill");
+  const by = input.cancelledBy ? findCaregiver(w, input.cancelledBy) : undefined;
+  const shift = makeShift(w, client, start, input.durationHours, [...input.requiredSkills], by?.seed.id ?? null);
+  if (by)
+    w.bookings = w.bookings.filter(
+      (b) => !(b.caregiverId === by.seed.id && b.start < start.getTime() + input.durationHours * HOUR && start.getTime() < b.end),
+    );
+  w.openShifts.push(shift);
+  notify();
+  return { ...shift };
+}
+
 export async function runSimulation(numShifts: number): Promise<SimulationResult[]> {
   if (!Number.isInteger(numShifts) || numShifts < 1 || numShifts > 10000)
     throw new Error("Choose between 1 and 10,000 shifts");
-  await delay(400);
-  // Deterministic synthetic trials: higher-likelihood caregivers tend to accept earlier.
-  const strategies = [
-    "Shift Match (one at a time)",
-    "Shift Match (top 3)",
-    "Random qualified pick",
-  ];
-  return strategies.map((strategy, si) => {
-    const counts = caregivers.map((c) => ({ name: c.name, offers: 0 }));
-    let minutes = 0,
-      offers = 0,
-      success = 0;
-    for (let t = 0; t < numShifts; t++) {
-      const shift = shifts[t % shifts.length];
-      if (!shift) continue;
-      const cs = rank(shift.id).candidates;
-      const ordered =
-        si === 2
-          ? [...cs].sort(
-              (a, b) =>
-                ((Number(a.caregiverId.slice(3)) * 17 + t * 13) % 29) -
-                ((Number(b.caregiverId.slice(3)) * 17 + t * 13) % 29),
-            )
-          : cs;
-      let accepted = false;
-      let trialOffers = 0;
-      let trialMinutes = 0;
-      for (let k = 0; k < ordered.length; k += si === 1 ? 3 : 1) {
-        const batch = ordered.slice(k, k + (si === 1 ? 3 : 1));
-        trialMinutes += si === 1 ? 4 : 6;
-        for (const c of batch) {
-          trialOffers++;
-          const item = counts.find((x) => x.name === c.name);
-          if (item) item.offers++;
-          const roll = ((t * 37 + k * 19 + Number(c.caregiverId.slice(3)) * 11) % 101) / 100;
-          if (roll < c.score) accepted = true;
-        }
-        if (accepted) break;
-      }
-      offers += trialOffers;
-      if (accepted) {
-        success++;
-        minutes += trialMinutes;
-      }
-    }
-    return {
-      strategy,
-      avgMinutesToFill: +(minutes / Math.max(1, success)).toFixed(1),
-      avgOffersPerShift: +(offers / numShifts).toFixed(2),
-      fillRate: +((success / numShifts) * 100).toFixed(1),
-      offersPerCaregiver: counts,
-    };
-  });
+  await delay();
+  return simulate(getWorld(), numShifts);
+}
+
+export async function getModelInfo(): Promise<ModelInfo> {
+  await delay(0);
+  const m = getWorld().model;
+  return {
+    trainingOffers: m.trainingOffers,
+    holdoutOffers: m.holdoutOffers,
+    holdoutAccuracy: Math.round(m.holdoutAccuracy * 1000) / 1000,
+    holdoutAuc: Math.round(m.holdoutAuc * 1000) / 1000,
+    baseAcceptRate: Math.round(m.baseAcceptRate * 1000) / 1000,
+    onlineUpdates: m.onlineUpdates,
+    features: FEATURES.map((f, i) => ({ ...f, weight: Math.round((m.weights[i] ?? 0) * 100) / 100 })),
+  };
+}
+
+export interface TodayStats {
+  open: number;
+  urgent: number;
+  offersOut: number;
+  filledToday: number;
+  avgMinutesToFill: number | null;
+}
+
+/** Live numbers for the top bar. Synchronous so it can re-render on every engine change. */
+export function statsNow(): TodayStats {
+  const w = getWorld();
+  const filled = w.pastShifts.filter((p) => p.id.startsWith("shift-"));
+  return {
+    open: w.openShifts.length,
+    urgent: w.openShifts.filter((s) => s.noticeHours < 12).length,
+    offersOut: [...dispatches.values()].filter((d) => d.state.status === "running").length,
+    filledToday: filled.length,
+    avgMinutesToFill: filled.length
+      ? Math.round(filled.reduce((n, p) => n + p.minutesToFill, 0) / filled.length)
+      : null,
+  };
 }
