@@ -50,7 +50,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (version) void queryClient.invalidateQueries();
   }, [version, queryClient]);
-  const title = tabs.find((t) => t.to === path)?.label ?? "Page not found";
+  // Hosts like Amplify may add a trailing slash (/agent/), so normalize before matching.
+  const cleanPath = path.length > 1 ? path.replace(/\/+$/, "") : path;
+  const title = tabs.find((t) => t.to === cleanPath)?.label ?? "Page not found";
   useEffect(() => {
     document.title = `${title} · Shift Match`;
   }, [title]);
